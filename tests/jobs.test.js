@@ -107,3 +107,27 @@ test('importing shifts adds their jobs to the list', async () => {
 test('jobsInShifts lists each job once', () => {
   assert.deepEqual(jobsInShifts([shift('A', 1), shift('B', 2), shift('a', 3)]), ['A', 'B']);
 });
+
+test('undoing an import also removes jobs it created that have no shifts left', async () => {
+  const { importFiles } = await import('../src/importers.js');
+  const { readFileSync } = await import('node:fs');
+  const s = store.emptyState();
+  addJob(s, 'Tech Support');
+  const text = readFileSync(new URL('./fixtures/undo-test.csv', import.meta.url), 'utf8');
+  store.applyImport(s, importFiles([{ name: 'undo-test.csv', text }], s.shifts), NOW);
+  assert.equal(s.shifts.length, 3);
+  assert.deepEqual(activeJobs(s), ['Tech Support', 'Undo Test']);
+  assert.equal(store.undoLastImport(s), 3);
+  assert.deepEqual(activeJobs(s), ['Tech Support']);
+  assert.equal(defaultJob(s), 'Tech Support');
+});
+
+test('undo keeps a job the import created if you have since used it', async () => {
+  const { importFiles } = await import('../src/importers.js');
+  const csv = '"Job","Clocked In","Clocked Out","Duration","Breaks"\n"Bartending","9/29/25 7:00 PM","9/29/25 11:00 PM","4:00",""\n';
+  const s = store.emptyState();
+  store.applyImport(s, importFiles([{ name: 'x.csv', text: csv }], s.shifts), NOW);
+  store.startWork(s, NOW, NOW, 'Bartending');
+  store.undoLastImport(s);
+  assert.deepEqual(activeJobs(s), ['Bartending']);
+});

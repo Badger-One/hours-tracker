@@ -1,0 +1,4 @@
+"Job","Clocked In","Clocked Out","Duration","Comment","Breaks","Adjustments","TotalTimeAdjustment","TotalEarningsAdjustment","TotalMileage"
+"Undo Test","1/8/24 9:00 AM","1/8/24 5:00 PM","7:30","Test shift 1","0:30 (12:00 PM to 12:30 PM)","","-0:30","0","0"
+"Undo Test","1/9/24 9:00 AM","1/9/24 1:00 PM","4:00","Test shift 2","","","","",""
+"Undo Test","1/10/24 10:00 AM","1/10/24 6:00 PM","8:00","Test shift 3","","","","",""

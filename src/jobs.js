@@ -115,10 +115,11 @@ export function removeJob(state, name) {
 }
 
 /** Make sure every job name on these shifts is in the list (used after an import and on Start Work). */
-export function rememberJobs(state, shifts) {
+export function rememberJobs(state, shifts, { importBatch } = {}) {
   for (const s of shifts) {
     if (s.job && !findJob(state, s.job)) {
-      state.jobs.push({ name: s.job, archived: false });
+      // A job created by an import remembers it, so undoing that import can remove the job too.
+      state.jobs.push(importBatch ? { name: s.job, archived: false, importBatch } : { name: s.job, archived: false });
       if (!state.settings.defaultJob) state.settings.defaultJob = s.job;
       log.info('jobs.add', { name: s.job, reason: 'seen on a shift' });
     }
@@ -130,4 +131,13 @@ export function jobsInShifts(shifts) {
   const names = [];
   for (const s of shifts) if (s.job && !names.some((n) => sameName(n, s.job))) names.push(s.job);
   return names;
+}
+
+/** Set (or clear, with null) a job's pay setup. See pay.js for its shape. */
+export function setJobPay(state, name, pay) {
+  const job = findJob(state, name);
+  if (!job) throw new Error('That job no longer exists.');
+  if (pay) job.pay = pay;
+  else delete job.pay;
+  log.info('jobs.pay', { job: job.name, type: pay?.type ?? 'none', rates: pay?.rates.length ?? 0 });
 }

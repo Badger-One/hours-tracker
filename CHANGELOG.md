@@ -6,11 +6,24 @@ Each pull request that changes the app adds a section at the top with a new vers
 
 Sections use these headings: **Added** (new features), **Changed** (existing features that work differently), **Fixed** (bugs), **Removed**.
 
+## [0.8.0] - 2026-10-02
+
+### Added
+
+- **Pay for each job** (Settings > Jobs > **Pay**): **Hourly** or **Salary**, with rates that start on a date. **Add raise** adds a new rate; shifts before a raise keep the old rate.
+- **Salary per year or per month.** Per month suits fixed monthly pay like military pay: each month shows exactly that amount.
+- **Overtime** for hourly jobs, set per job: after a number of hours per week or per day, at a multiplier (1.5 for time and a half). On by default at 40 hours a week.
+- **History** shows pay next to hours on every year, month, and week. Salaried jobs also show what the pay works out to per hour worked, for example "$4,500 · $28.95/hr". The period you're in counts salary only through today.
+- **Earned today** on the Clock tab for hourly jobs, counting up every second while you work. Salaried jobs aren't counted there, since a salary pays the same however long you work; their pay shows in History.
+
+Pay settings are saved on your phone but aren't in CSV backups yet.
+
 ## [0.7.1] - 2026-10-02
 
 ### Changed
 
 - **Undo last import** asks twice: first a confirmation showing how many shifts it removes, then you type **undo** (any capitals) before anything is removed.
+- Undoing an import also removes any job the import created that no longer has shifts.
 
 ## [0.7.0] - 2026-10-02
 

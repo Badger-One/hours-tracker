@@ -56,6 +56,12 @@
         </div>
       </div>
 
+      <!-- Shown once a job is paid hourly (Settings > Jobs > Pay) -->
+      <div id="earned-card" class="stat earned-card" hidden>
+        <span class="stat-label">Earned today</span>
+        <span id="stat-earned" class="stat-value">$0.00</span>
+      </div>
+
       <div id="actions" class="actions"></div>
       <div id="more-actions" class="link-row"></div>
 
@@ -211,6 +217,55 @@
       <label class="field"><span>Note</span><textarea id="shift-note" rows="2"></textarea></label>
 
       <button type="button" id="btn-shift-delete" class="button danger delete-shift">Delete shift</button>
+    </form>
+  </dialog>
+
+  <!-- Pay for one job: hourly or salary, rates with start dates, overtime -->
+  <dialog id="dlg-pay" class="sheet">
+    <form method="dialog" id="form-pay">
+      <div class="sheet-bar">
+        <button type="button" id="dlg-pay-cancel" class="bar-button cancel">Cancel</button>
+        <h2 id="dlg-pay-title" tabindex="-1" autofocus>Pay</h2>
+        <button type="submit" id="dlg-pay-save" class="bar-button strong">Save</button>
+      </div>
+
+      <label class="field">
+        <span>Pay type</span>
+        <select id="pay-type">
+          <option value="">No pay set</option>
+          <option value="hourly">Hourly</option>
+          <option value="salary">Salary</option>
+        </select>
+      </label>
+
+      <div id="pay-details">
+        <label class="field" id="pay-per-field">
+          <span>Salary amount is per</span>
+          <select id="pay-per">
+            <option value="year">Year</option>
+            <option value="month">Month (for example, military pay)</option>
+          </select>
+        </label>
+
+        <div class="field">
+          <span id="pay-rates-label">Rates</span>
+          <div id="pay-rates"></div>
+          <button type="button" id="btn-add-rate" class="button small secondary">Add raise</button>
+          <p class="hint">Each rate applies from its start date on. Shifts before a raise keep the old rate.</p>
+        </div>
+
+        <div id="pay-hourly-options" class="field">
+          <label class="check"><input type="checkbox" id="pay-ot-enabled"> Overtime</label>
+          <div id="pay-ot-fields" class="ot-fields">
+            <label>After <input id="pay-ot-threshold" type="number" inputmode="decimal" min="0" step="0.5"> hours per
+              <select id="pay-ot-per"><option value="week">week</option><option value="day">day</option></select></label>
+            <label>Pay <input id="pay-ot-multiplier" type="number" inputmode="decimal" min="1" step="0.1"> times the rate</label>
+          </div>
+        </div>
+
+      </div>
+
+      <ul id="pay-errors" class="form-error" role="alert"></ul>
     </form>
   </dialog>
 
