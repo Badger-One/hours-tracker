@@ -5,6 +5,10 @@ name: Publish site
 #   https://badger-one.github.io/hours-tracker/beta/   the test copy, from the beta branch
 #                                                      (or from main when there is no beta branch)
 # Runs whenever either branch changes.
+#
+# GitHub only lets the main branch publish the site. So a push to beta doesn't
+# publish by itself: it asks this workflow to run again on main, and that run
+# picks up the newest beta branch.
 
 on:
   push:
@@ -16,13 +20,25 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
+  # A push to beta: hand off to a run on main.
+  hand-off:
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run the publish workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main --repo "${{ github.repository }}"
+
   publish:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
