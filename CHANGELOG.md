@@ -6,6 +6,18 @@ Each pull request that changes the app adds a section at the top with a new vers
 
 Sections use these headings: **Added** (new features), **Changed** (existing features that work differently), **Fixed** (bugs), **Removed**.
 
+## [0.2.1] - 2026-10-02
+
+### Changed
+
+- The **Start at…**, **Clock out at…**, **Break at…**, and **End break at…** popups now have separate **Date** and **Time** fields. The quick-pick buttons ("15 min ago" and so on) are gone, and the calendar no longer opens by itself when the popup appears.
+- The shift editor has one **Date** with **Start** and **End** times. An end time earlier than the start (a shift past midnight) moves to the next day automatically.
+- **Cancel** and **Save** moved to the top bar of both popups, away from the iPhone's date and time pickers. **Delete shift** moved to the bottom with space above it, so tapping below a picker to close it can't hit a button.
+
+### Fixed
+
+- A new version now loads when you switch back to the app. Before, you had to swipe the app closed and reopen it.
+
 ## [0.2.0] - 2026-10-02
 
 ### Added

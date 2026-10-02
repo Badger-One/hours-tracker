@@ -239,7 +239,7 @@ body[data-status="scheduled"] .status-pill { background: var(--work-soft); color
 .sheet form { display: grid; gap: 12px; }
 .sheet h2 { margin: 0; }
 .sheet p { margin: 0; }
-.sheet input[type="datetime-local"],
+.sheet input[type="date"],
 .sheet input[type="time"],
 .sheet input[type="text"],
 .sheet textarea {
@@ -251,23 +251,41 @@ body[data-status="scheduled"] .status-pill { background: var(--work-soft); color
   background: var(--bg);
   color: var(--text);
 }
-/* iOS shrinks date inputs to fit their text unless told otherwise. */
-.sheet input[type="datetime-local"] { min-height: 46px; -webkit-appearance: none; appearance: none; }
-.sheet-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.sheet-buttons .button + .button { margin-top: 0; }
+/* iOS shrinks date and time inputs to fit their text unless told otherwise. */
+.sheet input[type="date"],
+.sheet input[type="time"] { min-height: 46px; -webkit-appearance: none; appearance: none; text-align: left; }
 
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip {
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font: inherit;
-  font-size: 14px;
+/* Cancel / title / Save across the top, like Apple's own apps. */
+.sheet-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin: -6px -6px 4px;
 }
+.sheet-bar h2 { font-size: 17px; text-align: center; outline: none; }
+.bar-button {
+  border: 0;
+  background: none;
+  color: var(--work);
+  font: inherit;
+  font-size: 17px;
+  padding: 8px 6px;
+  justify-self: start;
+  cursor: pointer;
+}
+.bar-button.strong { font-weight: 700; justify-self: end; }
+.bar-button:disabled { color: var(--muted); opacity: 0.5; }
+
+.date-time { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; }
+.date-time.three { grid-template-columns: 1.4fr 1fr 1fr; }
+.date-time.three.running { grid-template-columns: 1.4fr 1fr; }
+.date-time .field { min-width: 0; }
+
+/* Keep Delete well away from everything else. */
+.delete-shift { margin-top: 28px; }
 
 .break-row { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 6px; align-items: center; margin-bottom: 8px; }
+.break-row input { min-width: 0; }
 .break-row .to { color: var(--muted); font-size: 14px; }
 .break-row .remove { border: 0; background: none; color: var(--danger); font-size: 22px; padding: 4px 8px; }
 .break-row .running { color: var(--break); font-size: 14px; }

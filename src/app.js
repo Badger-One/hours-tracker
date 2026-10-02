@@ -8,7 +8,7 @@ import * as store from './store.js';
 import {
   MINUTE, HOUR, totalsForDay, workedMs, breakMs, startOfDay, startOfMinute,
   formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading, formatWhen,
-  toDateTimeInput, toTimeInput, fromDateTimeInput, timeOnOrAfter,
+  toTimeInput, fromDateAndTime, timeOnOrAfter,
 } from './time.js';
 import { importFiles } from './importers.js';
 import { buildExportCsv, exportFileName } from './exporter.js';
@@ -108,39 +108,15 @@ function undo() {
 
 let timePickerConfirm = null;
 
-const PAST_CHIPS = [
-  { label: '30 min ago', minutes: -30 },
-  { label: '15 min ago', minutes: -15 },
-  { label: '5 min ago', minutes: -5 },
-];
-const START_CHIPS = [
-  { label: '15 min ago', minutes: -15 },
-  { label: '5 min ago', minutes: -5 },
-  { label: 'In 5 min', minutes: 5 },
-  { label: 'In 15 min', minutes: 15 },
-  { label: 'In 30 min', minutes: 30 },
-];
-
 /** `onConfirm(ms)` runs the action. If it throws, the reason shows in the popup and it stays open. */
-function openTimePicker({ title, help = '', okLabel, initial = Date.now(), chips = PAST_CHIPS, onConfirm }) {
+function openTimePicker({ title, help = '', okLabel, initial = Date.now(), onConfirm }) {
   $('dlg-time-title').textContent = title;
   $('dlg-time-help').textContent = help;
+  $('dlg-time-help').hidden = !help;
   $('dlg-time-ok').textContent = okLabel;
-  $('dlg-time-input').value = toDateTimeInput(initial);
+  $('dlg-time-date').value = formatDate(initial);
+  $('dlg-time-time').value = toTimeInput(initial);
   $('dlg-time-error').textContent = '';
-  $('dlg-time-chips').replaceChildren(
-    ...chips.map((c) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'chip';
-      b.textContent = c.label;
-      b.addEventListener('click', () => {
-        $('dlg-time-input').value = toDateTimeInput(startOfMinute(Date.now()) + c.minutes * MINUTE);
-        $('dlg-time-error').textContent = '';
-      });
-      return b;
-    }),
-  );
   timePickerConfirm = onConfirm;
   log.debug('dialog.time.open', { title });
   $('dlg-time').showModal();
@@ -148,7 +124,7 @@ function openTimePicker({ title, help = '', okLabel, initial = Date.now(), chips
 
 function onTimePickerSubmit(event) {
   event.preventDefault(); // Keep the popup open until the action succeeds.
-  const at = fromDateTimeInput($('dlg-time-input').value);
+  const at = fromDateAndTime($('dlg-time-date').value, $('dlg-time-time').value);
   if (at == null) {
     $('dlg-time-error').textContent = 'Pick a date and time.';
     return;
@@ -171,9 +147,8 @@ function exactIfNow(at) {
 function pickStartTime() {
   openTimePicker({
     title: 'Start at',
-    help: 'Pick when your shift started, or a time later today to clock in ahead of time.',
+    help: 'Pick when your shift started, or a later time to clock in ahead.',
     okLabel: 'Start',
-    chips: START_CHIPS,
     onConfirm: (at) =>
       perform('startWork', (s, now) => store.startWork(s, now, exactIfNow(at)), (now) =>
         at > now ? `Starting at ${formatWhen(at, now)}` : `Clocked in at ${formatWhen(at, now)}`),
@@ -186,7 +161,6 @@ function pickScheduledStart() {
     title: 'Change start time',
     okLabel: 'Save',
     initial: shift.start,
-    chips: START_CHIPS,
     onConfirm: (at) =>
       perform('editScheduledStart', (s, now) => store.updateShift(s, shift.id, { ...shift, start: exactIfNow(at) }, now),
         (now) => `Starting at ${formatWhen(at, now)}`),
@@ -263,9 +237,11 @@ function openShiftEditor(shift) {
   }
 
   $('dlg-shift-title').textContent = editing.isNew ? 'Add shift' : editing.running ? 'Edit current shift' : 'Edit shift';
-  $('shift-start').value = toDateTimeInput(editing.start);
-  $('shift-end').value = editing.running ? '' : toDateTimeInput(editing.end);
+  $('shift-date').value = formatDate(editing.start);
+  $('shift-start').value = toTimeInput(editing.start);
+  $('shift-end').value = editing.running ? '' : toTimeInput(editing.end);
   $('shift-end-field').hidden = editing.running;
+  $('shift-end-field').parentElement.classList.toggle('running', editing.running);
   $('shift-running-note').hidden = !editing.running;
   $('btn-shift-delete').hidden = editing.isNew;
   $('btn-shift-delete').textContent = editing.running ? 'Delete this shift (cancel clock-in)' : 'Delete shift';
@@ -327,22 +303,33 @@ function addBreakRow() {
   updateShiftPreview();
 }
 
-/** Read the editor's inputs into a shift draft. Unreadable times become NaN so the rules report them. */
+/**
+ * Read the editor's inputs into a shift draft. Unreadable times become NaN so the rules report them.
+ *
+ * You pick one date and plain times. Each time after the start lands on the first
+ * matching moment after the one before it, so a shift that ends at 2 AM ends the
+ * next morning without a second date field.
+ */
 function readShiftDraft() {
-  const keep = (original, text, toText, parse) => (original != null && text === toText(original) ? original : parse(text) ?? NaN);
+  const dateText = $('shift-date').value;
+  const startText = $('shift-start').value;
+  // An untouched field keeps its exact original value (including seconds).
+  const startUntouched = Number.isFinite(editing.start) && dateText === formatDate(editing.start) && startText === toTimeInput(editing.start);
+  const start = startUntouched ? editing.start : fromDateAndTime(dateText, startText) ?? NaN;
 
-  const start = keep(editing.start, $('shift-start').value, toDateTimeInput, fromDateTimeInput);
-  const end = editing.running ? null : keep(editing.end, $('shift-end').value, toDateTimeInput, fromDateTimeInput);
+  const timeAfter = (original, text, base) => {
+    if (startUntouched && Number.isFinite(original) && text === toTimeInput(original)) return original;
+    return Number.isFinite(base) ? timeOnOrAfter(base, text) ?? NaN : NaN;
+  };
+
+  const end = editing.running ? null : timeAfter(editing.end, $('shift-end').value, start);
 
   const rowEls = [...$('shift-breaks').querySelectorAll('.break-row')];
   const breaks = editing.rows.map((row, i) => {
     const el = rowEls[i];
-    const startText = el.querySelector('.b-start').value;
-    const bStart = keep(row.start, startText, toTimeInput, (t) => (Number.isFinite(start) ? timeOnOrAfter(start, t) : null));
+    const bStart = timeAfter(row.start, el.querySelector('.b-start').value, start);
     if (row.running) return { start: bStart, end: null };
-    const endText = el.querySelector('.b-end').value;
-    const bEnd = keep(row.end, endText, toTimeInput, (t) => (Number.isFinite(bStart) ? timeOnOrAfter(bStart, t) : null));
-    return { start: bStart, end: bEnd };
+    return { start: bStart, end: timeAfter(row.end, el.querySelector('.b-end').value, bStart) };
   });
 
   return { job: $('shift-job').value, start, end, breaks, note: $('shift-note').value };
@@ -684,7 +671,7 @@ function wireUp() {
   // Popups
   $('form-time').addEventListener('submit', onTimePickerSubmit);
   $('dlg-time-cancel').addEventListener('click', () => $('dlg-time').close());
-  $('dlg-time-input').addEventListener('input', () => ($('dlg-time-error').textContent = ''));
+  $('form-time').addEventListener('input', () => ($('dlg-time-error').textContent = ''));
   $('form-shift').addEventListener('submit', onShiftEditorSubmit);
   $('form-shift').addEventListener('input', updateShiftPreview);
   $('btn-shift-cancel').addEventListener('click', () => $('dlg-shift').close());
@@ -729,16 +716,44 @@ function wireUp() {
   // Timers are computed from saved timestamps, so redrawing once a second is only cosmetic.
   setInterval(renderClock, 1000);
 
-  // When you come back to the app, redraw right away and reload data in case another tab changed it.
+  // When you come back to the app, redraw right away, reload data in case another tab
+  // changed it, and pick up a new version if one was published.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       flushLogs();
     } else {
       state = store.loadState(storage);
       render();
+      checkForUpdate();
     }
   });
   window.addEventListener('pagehide', flushLogs);
+}
+
+/**
+ * iPhone keeps a home-screen app frozen in the background instead of reopening it,
+ * so a new version wouldn't show up until you swiped the app closed. Instead, each
+ * time you come back, ask the server for the current version number and reload if
+ * it's newer. Your data is saved on the phone, so reloading loses nothing. It waits
+ * if a popup or an import review is open.
+ */
+async function checkForUpdate() {
+  try {
+    const res = await fetch('src/version.js', { cache: 'no-store' });
+    if (!res.ok) return;
+    const latest = /APP_VERSION = '([^']+)'/.exec(await res.text())?.[1];
+    if (!latest || latest === APP_VERSION) return;
+    if (document.querySelector('dialog[open]') || pendingImport) {
+      log.info('app.update.waiting', { from: APP_VERSION, to: latest, reason: 'popup or import open' });
+      return;
+    }
+    log.info('app.update', { from: APP_VERSION, to: latest });
+    flushLogs();
+    location.reload();
+  } catch (error) {
+    // No signal: try again next time.
+    log.debug('app.update.check.failed', { message: error.message });
+  }
 }
 
 function registerServiceWorker() {

@@ -7,7 +7,7 @@
 // If you add a file the app needs, add it to APP_FILES too.
 // tests/sw.test.js fails if this list and the real files drift apart.
 
-const CACHE = 'hours-tracker-v2';
+const CACHE = 'hours-tracker-v3';
 const NETWORK_TIMEOUT_MS = 3000;
 
 const APP_FILES = [
@@ -46,7 +46,9 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
-  const network = fetch(req).then((res) => {
+  // "no-cache" makes the phone ask GitHub whether each file changed instead of
+  // reusing its own copy for up to 10 minutes, so a new version arrives right away.
+  const network = fetch(req, { cache: 'no-cache' }).then((res) => {
     if (res.ok) {
       const copy = res.clone();
       caches.open(CACHE).then((cache) => cache.put(req, copy));

@@ -103,14 +103,8 @@ export function formatDate(ms) {
 }
 
 // ---- Form inputs ----
-// <input type="datetime-local"> uses "2026-10-01T07:00" and <input type="time"> uses "07:00",
-// both in local time. These convert between those strings and epoch ms.
-
-/** ms -> "2026-10-01T07:00" for a datetime-local input. */
-export function toDateTimeInput(ms) {
-  const d = new Date(ms);
-  return `${formatDate(ms)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
+// <input type="date"> uses "2026-10-01" (same as formatDate) and <input type="time">
+// uses "07:00", both in local time. These convert between those strings and epoch ms.
 
 /** ms -> "07:00" for a time input. */
 export function toTimeInput(ms) {
@@ -118,11 +112,12 @@ export function toTimeInput(ms) {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-/** "2026-10-01T07:00" -> ms, or null if blank or unreadable. */
-export function fromDateTimeInput(text) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(text ?? '');
-  if (!m) return null;
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5])).getTime();
+/** "2026-10-01" + "07:00" -> ms, or null if either is blank or unreadable. */
+export function fromDateAndTime(dateText, timeText) {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText ?? '');
+  const t = /^(\d{2}):(\d{2})/.exec(timeText ?? '');
+  if (!d || !t) return null;
+  return new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3]), Number(t[1]), Number(t[2])).getTime();
 }
 
 /**
