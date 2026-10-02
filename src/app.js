@@ -725,7 +725,7 @@ function renderJobFilter() {
   );
 
   box.hidden = false;
-  box.replaceChildren(all, filter);
+  box.replaceChildren(filter, all); // Filter jobs on the left (smaller), All jobs on the right (bigger).
   return current ? state.shifts.filter((s) => s.job === current) : state.shifts;
 }
 

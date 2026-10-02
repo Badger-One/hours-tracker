@@ -531,8 +531,8 @@ details.card[open] summary { margin-bottom: 8px; }
 
 .current-job { color: var(--text); font-weight: 700; margin-bottom: 4px; overflow-wrap: anywhere; }
 
-/* History job filter: "All jobs" and "Filter jobs" side by side. */
-.job-filter { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; margin: 0 0 14px; }
+/* History job filter: "Filter jobs" (smaller, up to 45% wide) and "All jobs" (bigger) side by side. */
+.job-filter { display: grid; grid-template-columns: fit-content(45%) minmax(0, 1fr); gap: 8px; margin: 0 0 14px; }
 .job-filter[hidden] { display: none; }
 .job-filter button {
   flex: none;

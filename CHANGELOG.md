@@ -14,7 +14,7 @@ Sections use these headings: **Added** (new features), **Changed** (existing fea
 - **When clocking in:** choose **Use the default job** (and which one) or **Ask which job every time**. Asking shows your jobs as big buttons when you tap Start Work or Start at; with only one job it never asks.
 - With 2 or more jobs, the Clock tab shows which job you're clocked into, and the clock-in message names it.
 - **Other job…** link on the Clock tab (with 2 or more jobs and **Use the default job**) to clock in to a different job without changing Settings.
-- History gets **All jobs** and **Filter jobs** buttons when your shifts span 2 or more jobs. **Filter jobs** opens a list of your jobs; picking one makes every year, month, and week total that job's total, and the button shows the job's name. **All jobs** clears it.
+- History gets **Filter jobs** and **All jobs** buttons when your shifts span 2 or more jobs. **Filter jobs** opens a list of your jobs; picking one makes every year, month, and week total that job's total, and the button shows the job's name. **All jobs** clears it.
 - The shift editor's Job field is a dropdown of your jobs.
 
 ### Changed
