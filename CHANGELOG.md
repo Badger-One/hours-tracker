@@ -6,6 +6,12 @@ Each pull request that changes the app adds a section at the top with a new vers
 
 Sections use these headings: **Added** (new features), **Changed** (existing features that work differently), **Fixed** (bugs), **Removed**.
 
+## [0.7.1] - 2026-10-02
+
+### Changed
+
+- **Undo last import** asks twice: first a confirmation showing how many shifts it removes, then you type **undo** (any capitals) before anything is removed.
+
 ## [0.7.0] - 2026-10-02
 
 ### Added

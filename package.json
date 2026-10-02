@@ -1,6 +1,6 @@
 {
   "name": "hours-tracker",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "description": "Track work time and breaks on iPhone. A home-screen web app with CSV import and export.",
   "type": "module",

@@ -15,6 +15,7 @@ import { importFiles } from './importers.js';
 import { buildHistory } from './history.js';
 import { backupDue, recordBackup, dismissBackupForToday } from './backup.js';
 import * as jobs from './jobs.js';
+import { typedConfirmation } from './confirm.js';
 import { buildExportCsv, backupFileName } from './exporter.js';
 import { saveFile } from './files.js';
 
@@ -1005,7 +1006,14 @@ function wireUp() {
     perform('hideBackupReminder', dismissBackupForToday, 'Backup reminder hidden until tomorrow.'));
   $('import-input').addEventListener('change', onImportFilesChosen);
   $('btn-undo-import').addEventListener('click', () => {
-    if (!confirm('Remove every shift added by the last import?')) return;
+    const count = state.lastImport?.count ?? 0;
+    if (!confirm(`Undo the last import? This removes the ${count} shift${count === 1 ? '' : 's'} it added.`)) return;
+    const answer = prompt('To confirm, type the word undo.');
+    if (!typedConfirmation(answer, 'undo')) {
+      log.info('import.undo.cancelled', { typed: answer == null ? null : answer.length ? 'other text' : 'blank' });
+      if (answer != null) alert('Nothing was removed. Type undo to confirm.');
+      return;
+    }
     const removed = store.undoLastImport(state);
     persist();
     render();
