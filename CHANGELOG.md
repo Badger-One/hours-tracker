@@ -6,6 +6,18 @@ Each pull request that changes the app adds a section at the top with a new vers
 
 Sections use these headings: **Added** (new features), **Changed** (existing features that work differently), **Fixed** (bugs), **Removed**.
 
+## [0.6.0] - 2026-10-02
+
+### Added
+
+- A **Back up to iCloud** banner on the Clock tab, under the Edit shift / Clock out at links. It shows once a day until you back up. Tap it, then **Save to Files**, then **Save**, without leaving the Clock tab. Backups are named by weekday (`hours-tracker-Mon.csv` through `hours-tracker-Sun.csv`), so the folder never holds more than 7 files and you can go back up to a week. Each one restores everything when imported.
+- The banner's **×** hides it until tomorrow, with **Undo** in case you tap it by mistake.
+- Settings shows when you last backed up, and **Back up now** there counts as today's backup too.
+
+### Fixed
+
+- Saving a backup or log to Files no longer creates a second, text-only file containing the file name.
+
 ## [0.5.0] - 2026-10-02
 
 ### Changed

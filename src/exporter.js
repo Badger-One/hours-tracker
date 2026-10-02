@@ -47,7 +47,12 @@ export function buildExportCsv(shifts) {
   return toCsv(rows);
 }
 
-/** "hours-tracker-2026-10-02.csv" */
-export function exportFileName(now) {
-  return `hours-tracker-${formatDate(now)}.csv`;
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * "hours-tracker-Fri.csv". One name per weekday, so the backup folder holds at most
+ * 7 files: each day replaces the one from a week ago, and you can go back up to a week.
+ */
+export function backupFileName(now) {
+  return `hours-tracker-${WEEKDAYS[new Date(now).getDay()]}.csv`;
 }

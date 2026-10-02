@@ -11,7 +11,8 @@ export async function saveFile(name, text, type = 'text/csv') {
 
   if (isTouchDevice && navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: name });
+      // Share only the file. Adding a title makes Save to Files save a second, text-only file.
+      await navigator.share({ files: [file] });
       log.info('file.shared', { name, bytes: text.length });
       return 'shared';
     } catch (error) {

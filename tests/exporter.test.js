@@ -50,3 +50,11 @@ test('restoring a backup over the same data adds nothing', () => {
   assert.equal(result.files[0].duplicates, 1);
   assert.equal(result.shifts.length, 0);
 });
+
+test('backups rotate through 7 weekday file names', async () => {
+  const { backupFileName } = await import('../src/exporter.js');
+  const names = new Set();
+  for (let d = 1; d <= 14; d++) names.add(backupFileName(new Date(2026, 9, d, 12).getTime()));
+  assert.equal(names.size, 7);
+  assert.equal(backupFileName(new Date(2026, 9, 2, 12).getTime()), 'hours-tracker-Fri.csv'); // Fri Oct 2, 2026
+});

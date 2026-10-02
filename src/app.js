@@ -13,7 +13,8 @@ import {
 } from './time.js';
 import { importFiles } from './importers.js';
 import { buildHistory } from './history.js';
-import { buildExportCsv, exportFileName } from './exporter.js';
+import { backupDue, recordBackup, dismissBackupForToday } from './backup.js';
+import { buildExportCsv, backupFileName } from './exporter.js';
 import { saveFile } from './files.js';
 
 // ---- Startup ----
@@ -88,6 +89,17 @@ function act(name, fn, message) {
 function showUndo(message, snapshot, action) {
   undoSnapshot = { json: snapshot, action };
   $('toast-text').textContent = message;
+  $('toast-undo').hidden = false;
+  $('toast').hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideUndo, UNDO_SECONDS * 1000);
+}
+
+/** Same bar as Undo, without the Undo button. For "Backed up 225 shifts." and similar. */
+function showNotice(message) {
+  undoSnapshot = null;
+  $('toast-text').textContent = message;
+  $('toast-undo').hidden = true;
   $('toast').hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(hideUndo, UNDO_SECONDS * 1000);
@@ -483,6 +495,10 @@ function renderClock() {
   $('stat-break').textContent = formatClock(thisBreak);
   $('stat-break-today').textContent = formatClock(today.breakMs);
 
+  const showBackup = backupDue(state, now);
+  $('backup-banner').hidden = !showBackup;
+  if (showBackup) $('backup-sub').textContent = lastBackupText(now);
+
   const longRunning = (status === 'working' || status === 'break') && now - shift.start > LONG_RUNNING_MS;
   $('long-shift-banner').hidden = !longRunning;
   if (longRunning) $('long-shift-text').textContent = `You've been clocked in since ${formatWhen(shift.start, now)}. Forgot to clock out?`;
@@ -668,6 +684,7 @@ function confirmImport() {
 
 function renderSettings() {
   $('app-version').textContent = APP_VERSION;
+  $('last-backup').textContent = lastBackupText(Date.now());
   const jobInput = $('setting-job');
   if (document.activeElement !== jobInput) jobInput.value = state.settings.job;
   jobInput.placeholder = store.effectiveJob(state);
@@ -686,9 +703,23 @@ function renderLogView() {
   $('log-view').textContent = entries.length ? entries.map(formatLogEntry).join('\n') : 'Nothing logged at this level.';
 }
 
-async function exportCsv() {
-  const now = Date.now();
-  await saveFile(exportFileName(now), buildExportCsv(state.shifts));
+/**
+ * Back up every finished shift: opens the Share sheet (Save to Files > Save) on the
+ * iPhone, or downloads the file on a computer. `from` is 'banner' or 'settings', for the log.
+ * Nothing may be awaited before saveFile(): iOS only opens the Share sheet straight from a tap.
+ */
+async function backUp(from) {
+  const shifts = state.shifts.filter((s) => s.end != null).length;
+  const how = await saveFile(backupFileName(Date.now()), buildExportCsv(state.shifts));
+  if (how === 'cancelled') return;
+  recordBackup(state, Date.now(), { shifts, how, from });
+  persist();
+  render();
+  showNotice(`Backed up ${shifts} shift${shifts === 1 ? '' : 's'}.`);
+}
+
+function lastBackupText(now) {
+  return state.backup.lastAt ? `Last backup: ${formatWhen(state.backup.lastAt, now)}` : 'Not backed up yet';
 }
 
 async function exportLogs() {
@@ -774,7 +805,11 @@ function wireUp() {
   });
 
   // Settings
-  $('btn-export').addEventListener('click', exportCsv);
+  $('btn-export').addEventListener('click', () => backUp('settings'));
+  $('btn-backup').addEventListener('click', () => backUp('banner'));
+  // Goes through perform() so the bar offers Undo if you tap × by mistake.
+  $('btn-backup-dismiss').addEventListener('click', () =>
+    perform('hideBackupReminder', dismissBackupForToday, 'Backup reminder hidden until tomorrow.'));
   $('import-input').addEventListener('change', onImportFilesChosen);
   $('btn-undo-import').addEventListener('click', () => {
     if (!confirm('Remove every shift added by the last import?')) return;

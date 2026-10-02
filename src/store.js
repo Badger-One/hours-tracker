@@ -6,7 +6,8 @@
 //     schema: 1,
 //     shifts: [ { id, job, start, end, breaks: [ { start, end } ], note, source, importBatch?, editedAt? } ],
 //     settings: { job, weekStartsOn },   // weekStartsOn: 0 = Sunday, 1 = Monday
-//     lastImport: { batchId, at, count } | null
+//     lastImport: { batchId, at, count } | null,
+//     backup: { lastAt, hiddenOn }   // lastAt: ms of the last backup; hiddenOn: "2026-10-02" if the banner was hidden that day
 //   }
 //
 // `start` and `end` are epoch milliseconds. A shift or break with `end: null` is
@@ -27,7 +28,7 @@ export const MAX_SCHEDULE_AHEAD_MS = 24 * HOUR;
 export const LONG_SHIFT_MS = 16 * HOUR;
 
 export function emptyState() {
-  return { schema: 1, shifts: [], settings: { job: '', weekStartsOn: 1 }, lastImport: null };
+  return { schema: 1, shifts: [], settings: { job: '', weekStartsOn: 1 }, lastImport: null, backup: { lastAt: null, hiddenOn: null } };
 }
 
 /** Read saved data. If it is damaged, keep a copy for recovery and start empty instead of crashing. */
@@ -40,7 +41,8 @@ export function loadState(storage) {
   try {
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.shifts)) throw new Error('Saved data has no shifts list');
-    const state = { ...emptyState(), ...parsed, settings: { ...emptyState().settings, ...parsed.settings } };
+    const defaults = emptyState();
+    const state = { ...defaults, ...parsed, settings: { ...defaults.settings, ...parsed.settings }, backup: { ...defaults.backup, ...parsed.backup } };
     log.info('store.load.ok', { shifts: state.shifts.length, bytes: raw.length });
     return state;
   } catch (error) {

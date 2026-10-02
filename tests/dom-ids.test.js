@@ -17,3 +17,9 @@ test('every element app.js looks up exists in index.html', () => {
   const missing = [...used].filter((id) => !CREATED_IN_CODE.has(id) && !html.includes(`id="${id}"`));
   assert.deepEqual(missing, [], `index.html has no element with these ids: ${missing.join(', ')}`);
 });
+
+test('sharing a file sends only the file (a title becomes an extra file in Save to Files)', () => {
+  const files = readFileSync(new URL('src/files.js', root), 'utf8');
+  const call = files.match(/navigator\.share\(\{([^}]*)\}\)/)[1];
+  assert.doesNotMatch(call, /title|text|url/);
+});

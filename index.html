@@ -57,6 +57,18 @@
 
       <div id="actions" class="actions"></div>
       <div id="more-actions" class="link-row"></div>
+
+      <!-- Once a day until you back up. Tap: Share sheet > Save to Files > Save. -->
+      <div id="backup-banner" class="backup-banner" hidden>
+        <button id="btn-backup" type="button" class="backup-main">
+          <svg class="backup-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 8a4 4 0 0 1 .5 7.97"/><path d="M12 12v8M9 15l3-3 3 3"/></svg>
+          <span>
+            <strong>Back up to iCloud</strong>
+            <span id="backup-sub" class="backup-sub"></span>
+          </span>
+        </button>
+        <button id="btn-backup-dismiss" type="button" class="backup-dismiss" aria-label="Hide until tomorrow">×</button>
+      </div>
     </section>
 
     <!-- History: past shifts by day. Tap a shift to edit it. -->
@@ -85,6 +97,7 @@
         <h3>Back up</h3>
         <p>Saves every finished shift as a CSV file. Save it to iCloud Drive; importing it later restores everything.</p>
         <button id="btn-export" class="button">Back up now (Export CSV)</button>
+        <p id="last-backup" class="hint last-backup"></p>
       </div>
       <div class="card">
         <h3>Import</h3>
