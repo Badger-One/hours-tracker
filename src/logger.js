@@ -1,7 +1,7 @@
 // Debug logging.
 //
 // Every log entry is saved on the device (newest 2000 kept) and also printed to the
-// browser console. You can read, filter, and export the log from More > Debug log,
+// browser console. You can read, filter, and export the log from Settings > Debug log,
 // which matters on an iPhone where there is no console to look at.
 //
 // Usage:

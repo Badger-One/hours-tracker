@@ -6,6 +6,13 @@ Each pull request that changes the app adds a section at the top with a new vers
 
 Sections use these headings: **Added** (new features), **Changed** (existing features that work differently), **Fixed** (bugs), **Removed**.
 
+## [0.5.0] - 2026-10-02
+
+### Changed
+
+- The **More** tab is now **Settings**, with a gear icon. Clock and History have icons too.
+- Settings is grouped into **Jobs**, **Backup & data** (Back up now, Import), **Preferences** (Week starts on), and **Troubleshooting** (Debug log, now hidden until you tap **Show**, and Delete all data).
+
 ## [0.4.0] - 2026-10-02
 
 ### Added

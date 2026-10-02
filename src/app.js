@@ -52,7 +52,7 @@ function getStorage() {
 
 function persist() {
   if (!store.saveState(storage, state)) {
-    alert('Could not save your data on this phone. Export a CSV now so nothing is lost, then check More > Debug log.');
+    alert('Could not save your data on this phone. Export a CSV now so nothing is lost, then check Settings > Debug log.');
   }
 }
 
@@ -582,7 +582,7 @@ function renderHistory() {
   const now = Date.now();
   const box = $('history');
   if (state.shifts.length === 0) {
-    box.innerHTML = '<p class="empty">No shifts yet. Tap Start Work on the Clock tab, or import a CSV from More.</p>';
+    box.innerHTML = '<p class="empty">No shifts yet. Tap Start Work on the Clock tab, or import a CSV in Settings.</p>';
     return;
   }
   const years = buildHistory(state.shifts, now, { weekStartsOn: state.settings.weekStartsOn ?? 1 });
@@ -606,7 +606,7 @@ function renderHistory() {
     .join('');
 }
 
-// ---- More screen ----
+// ---- Settings screen ----
 
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -666,7 +666,7 @@ function confirmImport() {
   alert(`Imported ${count} shift${count === 1 ? '' : 's'}.`);
 }
 
-function renderMore() {
+function renderSettings() {
   $('app-version').textContent = APP_VERSION;
   const jobInput = $('setting-job');
   if (document.activeElement !== jobInput) jobInput.value = state.settings.job;
@@ -729,7 +729,7 @@ async function checkStoragePersistence() {
 
 function showView(name) {
   currentView = name;
-  for (const v of ['clock', 'history', 'more']) $(`view-${v}`).hidden = v !== name;
+  for (const v of ['clock', 'history', 'settings']) $(`view-${v}`).hidden = v !== name;
   for (const b of document.querySelectorAll('.tabbar button')) {
     if (b.dataset.view === name) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
@@ -741,7 +741,7 @@ function showView(name) {
 function render() {
   renderClock();
   if (currentView === 'history') renderHistory();
-  if (currentView === 'more') renderMore();
+  if (currentView === 'settings') renderSettings();
 }
 
 function wireUp() {
@@ -773,7 +773,7 @@ function wireUp() {
     if (line) openShiftEditor(store.findShift(state, line.dataset.id));
   });
 
-  // More
+  // Settings
   $('btn-export').addEventListener('click', exportCsv);
   $('import-input').addEventListener('change', onImportFilesChosen);
   $('btn-undo-import').addEventListener('click', () => {
@@ -792,7 +792,7 @@ function wireUp() {
     state.settings.job = e.target.value.trim();
     log.info('settings.job', { job: state.settings.job });
     persist();
-    renderMore();
+    renderSettings();
   });
   $('log-level').addEventListener('change', renderLogView);
   $('btn-export-logs').addEventListener('click', exportLogs);
