@@ -64,8 +64,12 @@ The tests check the time math, CSV reading and writing, the Hours Tracker import
 
 1. Make a branch: `git switch -c my-change`
 2. Edit files. Use `npm start` to look at the result and `npm test` to check nothing broke.
-3. If you changed anything in `src/`, raise the number in `src/version.js` (0.1.0 to 0.1.1, for example). That number shows on the More screen, so you can tell when your phone has the new version.
-4. Commit, push, and open a pull request. When it's merged into `main`, GitHub publishes the new version within about a minute. Your phone picks it up the next time you open the app with a signal.
+3. Pick a new version number and put it in `src/version.js` and `package.json`. Raise the middle number for new features (0.2.0 to 0.3.0) and the last number for fixes (0.2.0 to 0.2.1). The number shows on the More screen, so you can tell when your phone has the new version.
+4. Add a section for that version at the top of [CHANGELOG.md](CHANGELOG.md) listing what changed.
+5. Commit, push, and open a pull request. The pull request form has a Changelog section; paste the same notes there.
+6. Merge it. Within about a minute GitHub publishes the new version and creates a [Release](https://github.com/Badger-One/hours-tracker/releases) with the changelog notes. Your phone picks it up the next time you open the app with a signal.
+
+A pull request that changes the app without steps 3 and 4 fails the **changelog** check, and `npm test` fails if the version in `src/version.js` has no changelog section.
 
 ## Project layout
 

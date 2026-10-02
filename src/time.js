@@ -102,8 +102,59 @@ export function formatDate(ms) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
+// ---- Form inputs ----
+// <input type="datetime-local"> uses "2026-10-01T07:00" and <input type="time"> uses "07:00",
+// both in local time. These convert between those strings and epoch ms.
+
+/** ms -> "2026-10-01T07:00" for a datetime-local input. */
+export function toDateTimeInput(ms) {
+  const d = new Date(ms);
+  return `${formatDate(ms)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/** ms -> "07:00" for a time input. */
+export function toTimeInput(ms) {
+  const d = new Date(ms);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/** "2026-10-01T07:00" -> ms, or null if blank or unreadable. */
+export function fromDateTimeInput(text) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(text ?? '');
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5])).getTime();
+}
+
+/**
+ * "12:30" -> the first moment at that time of day at or after `baseMs`.
+ * Used for break times inside a shift: a 12:15 AM break in a shift that started
+ * at 10 PM lands on the next day. Returns null if blank or unreadable.
+ */
+export function timeOnOrAfter(baseMs, text) {
+  const m = /^(\d{2}):(\d{2})/.exec(text ?? '');
+  if (!m) return null;
+  const d = new Date(baseMs);
+  d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  if (d.getTime() < startOfMinute(baseMs)) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
+
+/** Drop the seconds, so "7:00:40" counts as at-or-after "7:00". */
+export function startOfMinute(ms) {
+  return Math.floor(ms / MINUTE) * MINUTE;
+}
+
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "7:00 AM" if `ms` is today, "Tomorrow 7:00 AM", or "Mon Sep 28, 7:00 AM" otherwise. */
+export function formatWhen(ms, now) {
+  const day = startOfDay(ms);
+  if (day === startOfDay(now)) return formatTimeOfDay(ms);
+  if (day === startOfNextDay(now)) return `tomorrow ${formatTimeOfDay(ms)}`;
+  const d = new Date(ms);
+  return `${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${formatTimeOfDay(ms)}`;
+}
 
 /** "Thu, Oct 1, 2026". */
 export function formatDayHeading(ms) {

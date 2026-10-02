@@ -6,8 +6,9 @@ import { APP_VERSION } from './version.js';
 import { initLogger, log, installGlobalErrorHandlers, getLogs, clearLogs, logsAsText, formatLogEntry, flushLogs } from './logger.js';
 import * as store from './store.js';
 import {
-  totalsForDay, workedMs, breakMs, startOfDay,
-  formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading,
+  MINUTE, HOUR, totalsForDay, workedMs, breakMs, startOfDay, startOfMinute,
+  formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading, formatWhen,
+  toDateTimeInput, toTimeInput, fromDateTimeInput, timeOnOrAfter,
 } from './time.js';
 import { importFiles } from './importers.js';
 import { buildExportCsv, exportFileName } from './exporter.js';
@@ -30,6 +31,9 @@ let pendingImport = null; // An import that has been read but not confirmed yet.
 let currentView = 'clock';
 let renderedStatus = null; // Which buttons are on screen, so they're only rebuilt on change.
 
+const LONG_RUNNING_MS = 14 * HOUR; // Show "Forgot to clock out?" after this long.
+const UNDO_SECONDS = 8;
+
 const $ = (id) => document.getElementById(id);
 
 function getStorage() {
@@ -49,57 +53,427 @@ function persist() {
   }
 }
 
-/** Run an action from store.js, save, and redraw. Shows the problem instead of failing silently. */
-function act(name, fn) {
+// ---- Running actions, with Undo ----
+
+let undoSnapshot = null;
+let toastTimer = null;
+
+/**
+ * Run an action from store.js, save, redraw, and offer Undo.
+ * `message` is the Undo bar text; it can be a function so it can describe the result.
+ * Throws if the action is refused, so popups can show the reason in place.
+ */
+function perform(name, fn, message) {
+  const snapshot = JSON.stringify(state);
+  const now = Date.now();
+  fn(state, now);
+  persist();
+  render();
+  showUndo(typeof message === 'function' ? message(now) : message, snapshot, name);
+}
+
+/** Same as perform(), but shows a refusal in an alert. For buttons outside popups. */
+function act(name, fn, message) {
   try {
-    fn(state, Date.now());
-    persist();
-    render();
+    perform(name, fn, message);
   } catch (error) {
     log.warn('action.rejected', { action: name, message: error.message });
     alert(error.message);
   }
 }
 
+function showUndo(message, snapshot, action) {
+  undoSnapshot = { json: snapshot, action };
+  $('toast-text').textContent = message;
+  $('toast').hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideUndo, UNDO_SECONDS * 1000);
+}
+
+function hideUndo() {
+  $('toast').hidden = true;
+  undoSnapshot = null;
+}
+
+function undo() {
+  if (!undoSnapshot) return;
+  log.info('undo', { action: undoSnapshot.action });
+  state = JSON.parse(undoSnapshot.json);
+  hideUndo();
+  persist();
+  render();
+}
+
+// ---- Time picker popup (Start at…, Clock out at…, Break at…) ----
+
+let timePickerConfirm = null;
+
+const PAST_CHIPS = [
+  { label: '30 min ago', minutes: -30 },
+  { label: '15 min ago', minutes: -15 },
+  { label: '5 min ago', minutes: -5 },
+];
+const START_CHIPS = [
+  { label: '15 min ago', minutes: -15 },
+  { label: '5 min ago', minutes: -5 },
+  { label: 'In 5 min', minutes: 5 },
+  { label: 'In 15 min', minutes: 15 },
+  { label: 'In 30 min', minutes: 30 },
+];
+
+/** `onConfirm(ms)` runs the action. If it throws, the reason shows in the popup and it stays open. */
+function openTimePicker({ title, help = '', okLabel, initial = Date.now(), chips = PAST_CHIPS, onConfirm }) {
+  $('dlg-time-title').textContent = title;
+  $('dlg-time-help').textContent = help;
+  $('dlg-time-ok').textContent = okLabel;
+  $('dlg-time-input').value = toDateTimeInput(initial);
+  $('dlg-time-error').textContent = '';
+  $('dlg-time-chips').replaceChildren(
+    ...chips.map((c) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.textContent = c.label;
+      b.addEventListener('click', () => {
+        $('dlg-time-input').value = toDateTimeInput(startOfMinute(Date.now()) + c.minutes * MINUTE);
+        $('dlg-time-error').textContent = '';
+      });
+      return b;
+    }),
+  );
+  timePickerConfirm = onConfirm;
+  log.debug('dialog.time.open', { title });
+  $('dlg-time').showModal();
+}
+
+function onTimePickerSubmit(event) {
+  event.preventDefault(); // Keep the popup open until the action succeeds.
+  const at = fromDateTimeInput($('dlg-time-input').value);
+  if (at == null) {
+    $('dlg-time-error').textContent = 'Pick a date and time.';
+    return;
+  }
+  try {
+    timePickerConfirm(at);
+    $('dlg-time').close();
+  } catch (error) {
+    log.warn('action.rejected', { dialog: $('dlg-time-title').textContent, message: error.message });
+    $('dlg-time-error').textContent = error.message;
+  }
+}
+
+/** Same minute as the action time, but with "now" seconds kept when you picked the current minute. */
+function exactIfNow(at) {
+  const now = Date.now();
+  return at === startOfMinute(now) ? now : at;
+}
+
+function pickStartTime() {
+  openTimePicker({
+    title: 'Start at',
+    help: 'Pick when your shift started, or a time later today to clock in ahead of time.',
+    okLabel: 'Start',
+    chips: START_CHIPS,
+    onConfirm: (at) =>
+      perform('startWork', (s, now) => store.startWork(s, now, exactIfNow(at)), (now) =>
+        at > now ? `Starting at ${formatWhen(at, now)}` : `Clocked in at ${formatWhen(at, now)}`),
+  });
+}
+
+function pickScheduledStart() {
+  const shift = store.activeShift(state);
+  openTimePicker({
+    title: 'Change start time',
+    okLabel: 'Save',
+    initial: shift.start,
+    chips: START_CHIPS,
+    onConfirm: (at) =>
+      perform('editScheduledStart', (s, now) => store.updateShift(s, shift.id, { ...shift, start: exactIfNow(at) }, now),
+        (now) => `Starting at ${formatWhen(at, now)}`),
+  });
+}
+
+function pickClockOut() {
+  openTimePicker({
+    title: 'Clock out at',
+    help: 'Forgot to clock out? Pick when you actually finished.',
+    okLabel: 'Clock out',
+    onConfirm: (at) => perform('clockOut', (s, now) => store.clockOut(s, now, exactIfNow(at)), clockedOutMessage),
+  });
+}
+
+function pickBreakStart() {
+  openTimePicker({
+    title: 'Break started at',
+    okLabel: 'Start break',
+    onConfirm: (at) =>
+      perform('startBreak', (s, now) => store.startBreak(s, now, exactIfNow(at)), (now) => `Break started at ${formatWhen(at, now)}`),
+  });
+}
+
+function pickBreakEnd() {
+  openTimePicker({
+    title: 'Break ended at',
+    okLabel: 'End break',
+    onConfirm: (at) =>
+      perform('endBreak', (s, now) => store.endBreak(s, now, exactIfNow(at)), (now) => `Back to work at ${formatWhen(at, now)}`),
+  });
+}
+
+function clockedOutMessage() {
+  const last = state.shifts.filter((s) => s.end != null).sort((a, b) => a.end - b.end).at(-1);
+  return last ? `Clocked out at ${formatTimeOfDay(last.end)}. Worked ${formatHM(workedMs(last, last.end))}.` : 'Clocked out.';
+}
+
+// ---- Shift editor popup ----
+
+// What the editor is working on. Original values are kept so an untouched field
+// keeps its exact seconds instead of being rounded to the minute.
+let editing = null; // { id, isNew, running, start, end, rows: [{ start, end, running }] }
+
+function openShiftEditor(shift) {
+  const now = Date.now();
+  if (shift) {
+    editing = {
+      id: shift.id,
+      isNew: false,
+      running: shift.end == null,
+      start: shift.start,
+      end: shift.end,
+      rows: shift.breaks.map((b) => ({ start: b.start, end: b.end, running: b.end == null })),
+    };
+    $('shift-job').value = shift.job;
+    $('shift-note').value = shift.note ?? '';
+  } else {
+    // Start with yesterday, at the same times as your most recent shift (or 9 to 5).
+    const last = state.shifts.filter((s) => s.end != null).at(-1);
+    const sameTimeYesterday = (ms) => {
+      const d = new Date(ms);
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      y.setHours(d.getHours(), d.getMinutes(), 0, 0);
+      return y.getTime();
+    };
+    const start = last ? sameTimeYesterday(last.start) : startOfDay(now) - 15 * HOUR;
+    let end = last ? sameTimeYesterday(last.end) : startOfDay(now) - 7 * HOUR;
+    if (end <= start) end = start + 8 * HOUR; // The last shift crossed midnight.
+    editing = { id: null, isNew: true, running: false, start, end, rows: [] };
+    $('shift-job').value = store.effectiveJob(state);
+    $('shift-note').value = '';
+  }
+
+  $('dlg-shift-title').textContent = editing.isNew ? 'Add shift' : editing.running ? 'Edit current shift' : 'Edit shift';
+  $('shift-start').value = toDateTimeInput(editing.start);
+  $('shift-end').value = editing.running ? '' : toDateTimeInput(editing.end);
+  $('shift-end-field').hidden = editing.running;
+  $('shift-running-note').hidden = !editing.running;
+  $('btn-shift-delete').hidden = editing.isNew;
+  $('btn-shift-delete').textContent = editing.running ? 'Delete this shift (cancel clock-in)' : 'Delete shift';
+
+  renderBreakRows();
+  updateShiftPreview();
+  log.debug('dialog.shift.open', { id: editing.id, isNew: editing.isNew, running: editing.running });
+  $('dlg-shift').showModal();
+}
+
+function renderBreakRows() {
+  const box = $('shift-breaks');
+  if (editing.rows.length === 0) {
+    box.innerHTML = '<p class="hint">No breaks.</p>';
+    return;
+  }
+  box.replaceChildren(
+    ...editing.rows.map((row, i) => {
+      const el = document.createElement('div');
+      el.className = 'break-row';
+      el.innerHTML = `
+        <input type="time" class="b-start" aria-label="Break ${i + 1} start" value="${Number.isFinite(row.start) ? toTimeInput(row.start) : ''}">
+        <span class="to">to</span>
+        ${row.running
+          ? '<span class="running">now</span>'
+          : `<input type="time" class="b-end" aria-label="Break ${i + 1} end" value="${Number.isFinite(row.end) ? toTimeInput(row.end) : ''}">`}
+        <button type="button" class="remove" aria-label="Remove break ${i + 1}">×</button>`;
+      el.querySelector('.remove').addEventListener('click', () => {
+        saveRowInputs();
+        editing.rows.splice(i, 1);
+        renderBreakRows();
+        updateShiftPreview();
+      });
+      return el;
+    }),
+  );
+}
+
+/** Copy what's typed in the break inputs back into editing.rows (so re-rendering doesn't lose it). */
+function saveRowInputs() {
+  const draft = readShiftDraft();
+  editing.rows = editing.rows.map((row, i) => ({ ...row, start: draft.breaks[i].start, end: draft.breaks[i].end }));
+}
+
+function addBreakRow() {
+  saveRowInputs();
+  const draft = readShiftDraft();
+  const shiftEnd = editing.running ? Date.now() : draft.end;
+  let start;
+  if (Number.isFinite(draft.start) && Number.isFinite(shiftEnd)) {
+    start = editing.running ? startOfMinute(shiftEnd) - 30 * MINUTE : startOfMinute(draft.start + (shiftEnd - draft.start) / 2);
+  } else {
+    start = startOfMinute(Date.now());
+  }
+  editing.rows.push({ start, end: start + 30 * MINUTE, running: false });
+  // A running break must stay last, so a new finished break goes before it.
+  editing.rows.sort((a, b) => (a.running ? 1 : 0) - (b.running ? 1 : 0) || a.start - b.start);
+  renderBreakRows();
+  updateShiftPreview();
+}
+
+/** Read the editor's inputs into a shift draft. Unreadable times become NaN so the rules report them. */
+function readShiftDraft() {
+  const keep = (original, text, toText, parse) => (original != null && text === toText(original) ? original : parse(text) ?? NaN);
+
+  const start = keep(editing.start, $('shift-start').value, toDateTimeInput, fromDateTimeInput);
+  const end = editing.running ? null : keep(editing.end, $('shift-end').value, toDateTimeInput, fromDateTimeInput);
+
+  const rowEls = [...$('shift-breaks').querySelectorAll('.break-row')];
+  const breaks = editing.rows.map((row, i) => {
+    const el = rowEls[i];
+    const startText = el.querySelector('.b-start').value;
+    const bStart = keep(row.start, startText, toTimeInput, (t) => (Number.isFinite(start) ? timeOnOrAfter(start, t) : null));
+    if (row.running) return { start: bStart, end: null };
+    const endText = el.querySelector('.b-end').value;
+    const bEnd = keep(row.end, endText, toTimeInput, (t) => (Number.isFinite(bStart) ? timeOnOrAfter(bStart, t) : null));
+    return { start: bStart, end: bEnd };
+  });
+
+  return { job: $('shift-job').value, start, end, breaks, note: $('shift-note').value };
+}
+
+function updateShiftPreview() {
+  const now = Date.now();
+  const draft = readShiftDraft();
+  const candidate = { ...draft, id: editing.id, breaks: [...draft.breaks].sort((a, b) => a.start - b.start) };
+  const others = state.shifts.filter((s) => s.id !== editing.id);
+  const problems = store.validateShift(candidate, others, now);
+
+  if (problems.length === 0) {
+    const worked = workedMs(candidate, now);
+    const br = breakMs(candidate, now);
+    const warnings = store.shiftWarnings(candidate, now);
+    $('shift-summary').textContent = `Worked ${formatHM(worked)} · Breaks ${formatHM(br)}${warnings.length ? ` · ${warnings.join(' ')}` : ''}`;
+  } else {
+    $('shift-summary').textContent = '';
+  }
+  $('shift-errors').replaceChildren(
+    ...problems.map((p) => {
+      const li = document.createElement('li');
+      li.textContent = p;
+      return li;
+    }),
+  );
+  $('btn-shift-save').disabled = problems.length > 0;
+}
+
+function onShiftEditorSubmit(event) {
+  event.preventDefault();
+  const draft = readShiftDraft();
+  try {
+    if (editing.isNew) {
+      perform('addShift', (s, now) => store.addShift(s, draft, now), `Added a shift on ${formatDayHeading(draft.start)}.`);
+    } else {
+      perform('editShift', (s, now) => store.updateShift(s, editing.id, draft, now), 'Shift saved.');
+    }
+    $('dlg-shift').close();
+  } catch (error) {
+    log.warn('action.rejected', { action: editing.isNew ? 'addShift' : 'editShift', message: error.message });
+    $('shift-errors').replaceChildren(
+      ...(error.problems ?? [error.message]).map((p) => Object.assign(document.createElement('li'), { textContent: p })),
+    );
+  }
+}
+
+function deleteEditingShift() {
+  const question = editing.running ? 'Delete this shift? Use this if you clocked in by mistake.' : 'Delete this shift?';
+  if (!confirm(question)) return;
+  const id = editing.id;
+  perform('deleteShift', (s) => store.deleteShift(s, id), 'Shift deleted.');
+  $('dlg-shift').close();
+}
+
 // ---- Clock screen ----
 
 const BUTTONS = {
-  off: [{ label: 'Start Work', cls: '', run: () => act('startWork', store.startWork) }],
+  off: [{ label: 'Start Work', cls: '', run: () => act('startWork', store.startWork, (now) => `Clocked in at ${formatTimeOfDay(now)}`) }],
+  scheduled: [
+    { label: 'Start Now', cls: '', run: () => act('startScheduledNow', store.startScheduledNow, (now) => `Clocked in at ${formatTimeOfDay(now)}`) },
+    { label: 'Cancel', cls: 'secondary', run: cancelScheduled },
+  ],
   working: [
-    { label: 'Start Break', cls: 'break', run: () => act('startBreak', store.startBreak) },
-    { label: 'Clock Out', cls: 'secondary', run: confirmClockOut },
+    { label: 'Start Break', cls: 'break', run: () => act('startBreak', store.startBreak, (now) => `Break started at ${formatTimeOfDay(now)}`) },
+    { label: 'Clock Out', cls: 'secondary', run: () => act('clockOut', store.clockOut, clockedOutMessage) },
   ],
   break: [
-    { label: 'End Break', cls: '', run: () => act('endBreak', store.endBreak) },
-    { label: 'Clock Out', cls: 'secondary', run: confirmClockOut },
+    { label: 'End Break', cls: '', run: () => act('endBreak', store.endBreak, (now) => `Back to work at ${formatTimeOfDay(now)}`) },
+    { label: 'Clock Out', cls: 'secondary', run: () => act('clockOut', store.clockOut, clockedOutMessage) },
   ],
 };
 
-function confirmClockOut() {
-  if (confirm('Clock out and end this shift?')) act('clockOut', store.clockOut);
+const editCurrent = () => openShiftEditor(store.activeShift(state));
+
+const LINKS = {
+  off: [{ label: 'Start at…', run: pickStartTime }],
+  scheduled: [{ label: 'Change start time', run: pickScheduledStart }],
+  working: [
+    { label: 'Edit shift', run: editCurrent },
+    { label: 'Break at…', run: pickBreakStart },
+    { label: 'Clock out at…', run: pickClockOut },
+  ],
+  break: [
+    { label: 'Edit shift', run: editCurrent },
+    { label: 'End break at…', run: pickBreakEnd },
+    { label: 'Clock out at…', run: pickClockOut },
+  ],
+};
+
+function cancelScheduled() {
+  const shift = store.activeShift(state);
+  act('cancelScheduled', (s) => store.deleteShift(s, shift.id), 'Scheduled start cancelled.');
+}
+
+function makeButtons(list, className) {
+  return list.map((b) => {
+    const el = document.createElement('button');
+    el.className = className(b);
+    el.textContent = b.label;
+    el.addEventListener('click', b.run);
+    return el;
+  });
 }
 
 function renderClock() {
   const now = Date.now();
   const shift = store.activeShift(state);
   const brk = store.activeBreak(shift);
-  const status = store.currentStatus(state);
+  const status = store.currentStatus(state, now);
   const today = totalsForDay(state.shifts, now);
 
   const sessionWorked = shift ? workedMs(shift, now) : 0;
   const thisBreak = brk ? now - brk.start : 0;
 
   document.body.dataset.status = status;
-  $('status').textContent = { off: 'Off the clock', working: 'Working', break: 'On break' }[status];
+  $('status').textContent = { off: 'Off the clock', scheduled: 'Scheduled', working: 'Working', break: 'On break' }[status];
 
-  if (status === 'working') {
+  if (status === 'scheduled') {
+    $('hero-label').textContent = 'Starts in';
+    $('hero-time').textContent = formatClock(shift.start - now);
+    $('since').textContent = `Clocking in at ${formatWhen(shift.start, now)}`;
+  } else if (status === 'working') {
     $('hero-label').textContent = 'Working this session';
     $('hero-time').textContent = formatClock(sessionWorked);
-    $('since').textContent = `Clocked in at ${formatTimeOfDay(shift.start)}`;
+    $('since').textContent = `Clocked in at ${formatWhen(shift.start, now)}`;
   } else if (status === 'break') {
     $('hero-label').textContent = 'On break';
     $('hero-time').textContent = formatClock(thisBreak);
-    $('since').textContent = `Break started at ${formatTimeOfDay(brk.start)}`;
+    $('since').textContent = `Break started at ${formatWhen(brk.start, now)}`;
   } else {
     $('hero-label').textContent = 'Worked today';
     $('hero-time').textContent = formatClock(today.workedMs);
@@ -111,18 +485,15 @@ function renderClock() {
   $('stat-break').textContent = formatClock(thisBreak);
   $('stat-break-today').textContent = formatClock(today.breakMs);
 
+  const longRunning = (status === 'working' || status === 'break') && now - shift.start > LONG_RUNNING_MS;
+  $('long-shift-banner').hidden = !longRunning;
+  if (longRunning) $('long-shift-text').textContent = `You've been clocked in since ${formatWhen(shift.start, now)}. Forgot to clock out?`;
+
   // Rebuilding buttons every second would swallow taps, so only do it when the status changes.
   if (status !== renderedStatus) {
-    const box = $('actions');
-    box.replaceChildren(
-      ...BUTTONS[status].map((b) => {
-        const el = document.createElement('button');
-        el.className = `button ${b.cls}`.trim();
-        el.textContent = b.label;
-        el.addEventListener('click', b.run);
-        return el;
-      }),
-    );
+    if (renderedStatus === 'scheduled' && status === 'working') log.info('shift.schedule.began', { id: shift.id });
+    $('actions').replaceChildren(...makeButtons(BUTTONS[status], (b) => `button ${b.cls}`.trim()));
+    $('more-actions').replaceChildren(...makeButtons(LINKS[status], () => 'link-button'));
     renderedStatus = status;
   }
 }
@@ -154,9 +525,13 @@ function renderHistory() {
         <div class="day-head"><span>${formatDayHeading(day)}</span><span class="total">${formatHM(worked)}</span></div>
         ${shifts
           .map((s) => {
-            const end = s.end == null ? 'now' : formatTimeOfDay(s.end);
+            const end = s.end == null ? (s.start > now ? 'scheduled' : 'now') : formatTimeOfDay(s.end);
             const br = breakMs(s, now);
-            return `<div class="shift-line"><span>${formatTimeOfDay(s.start)} to ${end}</span><span>${formatHM(br) !== '0:00' ? `break ${formatHM(br)} · ` : ''}${formatHM(workedMs(s, now))}</span></div>`;
+            const tag = s.editedAt ? '<span class="tag">edited</span>' : s.source === 'manual' ? '<span class="tag">added</span>' : '';
+            return `<button type="button" class="shift-line tap" data-id="${s.id}">
+              <span>${formatTimeOfDay(s.start)} to ${end}${tag}</span>
+              <span>${formatHM(br) !== '0:00' ? `break ${formatHM(br)} · ` : ''}${formatHM(workedMs(s, now))}</span>
+            </button>`;
           })
           .join('')}`;
       return el;
@@ -230,9 +605,9 @@ function renderMore() {
   if (document.activeElement !== jobInput) jobInput.value = state.settings.job;
   jobInput.placeholder = store.effectiveJob(state);
 
-  const undo = $('btn-undo-import');
-  undo.hidden = !state.lastImport;
-  if (state.lastImport) undo.textContent = `Undo last import (${state.lastImport.count} shifts)`;
+  const undoImport = $('btn-undo-import');
+  undoImport.hidden = !state.lastImport;
+  if (state.lastImport) undoImport.textContent = `Undo last import (${state.lastImport.count} shifts)`;
 
   renderLogView();
 }
@@ -305,6 +680,27 @@ function wireUp() {
   for (const b of document.querySelectorAll('.tabbar button')) {
     b.addEventListener('click', () => showView(b.dataset.view));
   }
+
+  // Popups
+  $('form-time').addEventListener('submit', onTimePickerSubmit);
+  $('dlg-time-cancel').addEventListener('click', () => $('dlg-time').close());
+  $('dlg-time-input').addEventListener('input', () => ($('dlg-time-error').textContent = ''));
+  $('form-shift').addEventListener('submit', onShiftEditorSubmit);
+  $('form-shift').addEventListener('input', updateShiftPreview);
+  $('btn-shift-cancel').addEventListener('click', () => $('dlg-shift').close());
+  $('btn-shift-delete').addEventListener('click', deleteEditingShift);
+  $('btn-add-break').addEventListener('click', addBreakRow);
+  $('toast-undo').addEventListener('click', undo);
+  $('btn-banner-clockout').addEventListener('click', pickClockOut);
+
+  // History
+  $('btn-add-shift').addEventListener('click', () => openShiftEditor(null));
+  $('history').addEventListener('click', (e) => {
+    const line = e.target.closest('[data-id]');
+    if (line) openShiftEditor(store.findShift(state, line.dataset.id));
+  });
+
+  // More
   $('btn-export').addEventListener('click', exportCsv);
   $('import-input').addEventListener('change', onImportFilesChosen);
   $('btn-undo-import').addEventListener('click', () => {
