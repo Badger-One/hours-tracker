@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#0f766e">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -94,6 +94,13 @@
         <label class="field">
           <span>Job name for new shifts</span>
           <input id="setting-job" type="text" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>Week starts on (for History week totals)</span>
+          <select id="setting-week-start">
+            <option value="1">Monday</option>
+            <option value="0">Sunday</option>
+          </select>
         </label>
       </div>
 

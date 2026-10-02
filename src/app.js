@@ -3,15 +3,16 @@
 // can be tested without a browser; this file should stay mostly "glue".
 
 import { APP_VERSION } from './version.js';
-import { IS_BETA } from './env.js';
+import { IS_BETA, storageKey } from './env.js';
 import { initLogger, log, installGlobalErrorHandlers, getLogs, clearLogs, logsAsText, formatLogEntry, flushLogs } from './logger.js';
 import * as store from './store.js';
 import {
   MINUTE, HOUR, totalsForDay, workedMs, breakMs, startOfDay, startOfMinute,
-  formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading, formatWhen, formatShortDay, formatMonthHeading,
-  toTimeInput, fromDateAndTime, timeOnOrAfter,
+  formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading, formatWhen, formatShortDay, formatMonthHeading, formatMonthDay,
+  toTimeInput, fromDateAndTime, timeOnOrAfter, roundToQuarterHour,
 } from './time.js';
 import { importFiles } from './importers.js';
+import { buildHistory } from './history.js';
 import { buildExportCsv, exportFileName } from './exporter.js';
 import { saveFile } from './files.js';
 
@@ -221,7 +222,8 @@ function openShiftEditor(shift) {
     $('shift-job').value = shift.job;
     $('shift-note').value = shift.note ?? '';
   } else {
-    // Start with yesterday, at the same times as your most recent shift (or 9 to 5).
+    // Start with yesterday, at the same times as your most recent shift rounded to the
+    // nearest 15 minutes (8:00 AM to 5:07 PM becomes 8:00 AM to 5:00 PM), or 9 to 5.
     const last = state.shifts.filter((s) => s.end != null).at(-1);
     const sameTimeYesterday = (ms) => {
       const d = new Date(ms);
@@ -230,8 +232,8 @@ function openShiftEditor(shift) {
       y.setHours(d.getHours(), d.getMinutes(), 0, 0);
       return y.getTime();
     };
-    const start = last ? sameTimeYesterday(last.start) : startOfDay(now) - 15 * HOUR;
-    let end = last ? sameTimeYesterday(last.end) : startOfDay(now) - 7 * HOUR;
+    const start = last ? roundToQuarterHour(sameTimeYesterday(last.start)) : startOfDay(now) - 15 * HOUR;
+    let end = last ? roundToQuarterHour(sameTimeYesterday(last.end)) : startOfDay(now) - 7 * HOUR;
     if (end <= start) end = start + 8 * HOUR; // The last shift crossed midnight.
     editing = { id: null, isNew: true, running: false, start, end, rows: [] };
     $('shift-job').value = store.effectiveJob(state);
@@ -496,52 +498,112 @@ function renderClock() {
 
 // ---- History screen ----
 
-/**
- * One line per shift, newest first, grouped into a card per month:
+/*
+ * Years, then months, then weeks, newest first. Each year and month heading is a
+ * button that opens or closes it. Closed months show only their totals, so you can
+ * compare months at a glance:
  *
- *   October 2026                      8:07
- *   Thu, Oct 1   8:00 AM to 5:07 PM   8:07
+ *   2026                                  1,412:05
+ *   180 days · avg 7:51
+ *   ▾ October 2026                            8:07
+ *     1 day · avg 8:07
+ *       Sep 28 to Oct 4                      40:12
+ *       Thu, Oct 1   8:00 AM to 5:07 PM       8:07
+ *   ▸ September 2026                        152:40
+ *     19 days · avg 8:02
  *
- * A day with two shifts shows its date on the first line only.
- * Tap a line to edit that shift.
+ * The current month and every year start open. What you open or close is
+ * remembered on this phone.
  */
+
+const UI_KEY = storageKey('ui:v1');
+let ui = loadUi();
+
+function loadUi() {
+  try {
+    const saved = JSON.parse(storage?.getItem(UI_KEY) ?? '{}');
+    return { open: saved.open ?? {} };
+  } catch {
+    return { open: {} };
+  }
+}
+
+function isOpen(key, openByDefault) {
+  return ui.open[key] ?? openByDefault;
+}
+
+function toggleGroup(key, openByDefault) {
+  ui.open[key] = !isOpen(key, openByDefault);
+  try {
+    storage?.setItem(UI_KEY, JSON.stringify(ui));
+  } catch {
+    // Only a display preference; fine to lose.
+  }
+  log.debug('history.toggle', { key, open: ui.open[key] });
+  renderHistory();
+}
+
+function daysSummary(t) {
+  if (t.daysWorked === 0) return 'No time worked yet';
+  return `${t.daysWorked} day${t.daysWorked === 1 ? '' : 's'} · avg ${formatHM(t.avgPerDayMs)}`;
+}
+
+function groupHeading({ key, openByDefault, cls, label, totals }) {
+  const open = isOpen(key, openByDefault);
+  return `<button type="button" class="${cls}" data-toggle="${key}" data-default-open="${openByDefault}" aria-expanded="${open}">
+    <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    <span class="label">${label}</span>
+    <span class="total">${formatHM(totals.workedMs)}</span>
+    <span class="sub">${daysSummary(totals)}</span>
+  </button>`;
+}
+
+function shiftRow(s, showDate, now) {
+  const end = s.end == null ? (s.start > now ? 'scheduled' : 'now') : formatTimeOfDay(s.end);
+  return `<button type="button" class="shift-row" data-id="${s.id}">
+    <span class="day-name">${showDate ? formatShortDay(s.start) : ''}</span>
+    <span class="times">${formatTimeOfDay(s.start)} to ${end}</span>
+    <span class="worked">${formatHM(workedMs(s, now))}</span>
+  </button>`;
+}
+
+function monthBody(month, now) {
+  return month.weeks
+    .map((week) => {
+      const rows = week.shifts
+        .map((s, i) => shiftRow(s, i === 0 || startOfDay(week.shifts[i - 1].start) !== startOfDay(s.start), now))
+        .join('');
+      return `<div class="week-head"><span>${formatMonthDay(week.start)} to ${formatMonthDay(week.end)}</span><span>${formatHM(week.fullWeekMs)}</span></div>${rows}`;
+    })
+    .join('');
+}
+
 function renderHistory() {
   const now = Date.now();
   const box = $('history');
-  const shifts = [...state.shifts].sort((a, b) => b.start - a.start);
-  if (shifts.length === 0) {
+  if (state.shifts.length === 0) {
     box.innerHTML = '<p class="empty">No shifts yet. Tap Start Work on the Clock tab, or import a CSV from More.</p>';
     return;
   }
+  const years = buildHistory(state.shifts, now, { weekStartsOn: state.settings.weekStartsOn ?? 1 });
 
-  const months = new Map(); // "2026-10" -> shifts in that month, newest first
-  for (const s of shifts) {
-    const key = formatDate(s.start).slice(0, 7);
-    if (!months.has(key)) months.set(key, []);
-    months.get(key).push(s);
-  }
-
-  box.replaceChildren(
-    ...[...months.values()].map((list) => {
-      const total = list.reduce((sum, s) => sum + workedMs(s, now), 0);
-      const card = document.createElement('div');
-      card.className = 'month';
-      card.innerHTML = `
-        <div class="month-head"><span>${formatMonthHeading(list[0].start)}</span><span class="total">${formatHM(total)}</span></div>
-        ${list
-          .map((s, i) => {
-            const sameDayAsAbove = i > 0 && startOfDay(list[i - 1].start) === startOfDay(s.start);
-            const end = s.end == null ? (s.start > now ? 'scheduled' : 'now') : formatTimeOfDay(s.end);
-            return `<button type="button" class="shift-row" data-id="${s.id}">
-              <span class="day-name">${sameDayAsAbove ? '' : formatShortDay(s.start)}</span>
-              <span class="times">${formatTimeOfDay(s.start)} to ${end}</span>
-              <span class="worked">${formatHM(workedMs(s, now))}</span>
-            </button>`;
-          })
-          .join('')}`;
-      return card;
-    }),
-  );
+  box.innerHTML = years
+    .map((y) => {
+      const yearKey = `year-${y.year}`;
+      const months = isOpen(yearKey, false)
+        ? y.months
+            .map((m) => {
+              const openByDefault = false;
+              return `<div class="month">
+                ${groupHeading({ key: m.key, openByDefault, cls: 'month-head', label: formatMonthHeading(m.start), totals: m })}
+                ${isOpen(m.key, openByDefault) ? monthBody(m, now) : ''}
+              </div>`;
+            })
+            .join('')
+        : '';
+      return `<section class="year">${groupHeading({ key: yearKey, openByDefault: false, cls: 'year-head', label: y.year, totals: y })}${months}</section>`;
+    })
+    .join('');
 }
 
 // ---- More screen ----
@@ -609,6 +671,7 @@ function renderMore() {
   const jobInput = $('setting-job');
   if (document.activeElement !== jobInput) jobInput.value = state.settings.job;
   jobInput.placeholder = store.effectiveJob(state);
+  $('setting-week-start').value = String(state.settings.weekStartsOn ?? 1);
 
   const undoImport = $('btn-undo-import');
   undoImport.hidden = !state.lastImport;
@@ -682,6 +745,9 @@ function render() {
 }
 
 function wireUp() {
+  // Block pinch zoom. iOS ignores user-scalable=no, but these gesture events let us stop it.
+  for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault());
+
   for (const b of document.querySelectorAll('.tabbar button')) {
     b.addEventListener('click', () => showView(b.dataset.view));
   }
@@ -701,6 +767,8 @@ function wireUp() {
   // History
   $('btn-add-shift').addEventListener('click', () => openShiftEditor(null));
   $('history').addEventListener('click', (e) => {
+    const heading = e.target.closest('[data-toggle]');
+    if (heading) return toggleGroup(heading.dataset.toggle, heading.dataset.defaultOpen === 'true');
     const line = e.target.closest('[data-id]');
     if (line) openShiftEditor(store.findShift(state, line.dataset.id));
   });
@@ -714,6 +782,11 @@ function wireUp() {
     persist();
     render();
     alert(`Removed ${removed} shift${removed === 1 ? '' : 's'}.`);
+  });
+  $('setting-week-start').addEventListener('change', (e) => {
+    state.settings.weekStartsOn = Number(e.target.value);
+    log.info('settings.weekStartsOn', { weekStartsOn: state.settings.weekStartsOn });
+    persist();
   });
   $('setting-job').addEventListener('change', (e) => {
     state.settings.job = e.target.value.trim();
@@ -751,27 +824,38 @@ function wireUp() {
 /**
  * iPhone keeps a home-screen app frozen in the background instead of reopening it,
  * so a new version wouldn't show up until you swiped the app closed. Instead, each
- * time you come back, ask the server for the current version number and reload if
- * it's newer. Your data is saved on the phone, so reloading loses nothing. It waits
- * if a popup or an import review is open.
+ * time you come back, the app asks which build is published (build.txt, written by
+ * the publish workflow) and reloads if it's a different one from when it started.
+ * Comparing builds instead of version numbers means fixes to Hours Beta show up even
+ * when the version number stays the same. Your data is saved on the phone, so
+ * reloading loses nothing. It waits if a popup or an import review is open.
  */
-async function checkForUpdate() {
+let startedOnBuild = null;
+
+async function publishedBuild() {
   try {
-    const res = await fetch('src/version.js', { cache: 'no-store' });
-    if (!res.ok) return;
-    const latest = /APP_VERSION = '([^']+)'/.exec(await res.text())?.[1];
-    if (!latest || latest === APP_VERSION) return;
-    if (document.querySelector('dialog[open]') || pendingImport) {
-      log.info('app.update.waiting', { from: APP_VERSION, to: latest, reason: 'popup or import open' });
-      return;
-    }
-    log.info('app.update', { from: APP_VERSION, to: latest });
-    flushLogs();
-    location.reload();
-  } catch (error) {
-    // No signal: try again next time.
-    log.debug('app.update.check.failed', { message: error.message });
+    const res = await fetch('build.txt', { cache: 'no-store' });
+    return res.ok ? (await res.text()).trim() : null;
+  } catch {
+    return null; // No signal.
   }
+}
+
+async function checkForUpdate() {
+  const latest = await publishedBuild();
+  if (!latest) return;
+  if (!startedOnBuild) {
+    startedOnBuild = latest;
+    return;
+  }
+  if (latest === startedOnBuild) return;
+  if (document.querySelector('dialog[open]') || pendingImport) {
+    log.info('app.update.waiting', { from: startedOnBuild, to: latest, reason: 'popup or import open' });
+    return;
+  }
+  log.info('app.update', { version: APP_VERSION, from: startedOnBuild, to: latest });
+  flushLogs();
+  location.reload();
 }
 
 function registerServiceWorker() {
@@ -787,6 +871,7 @@ function registerServiceWorker() {
 
 $('beta-strip').hidden = !IS_BETA;
 wireUp();
+checkForUpdate(); // Records which build this launch started on.
 render();
 checkStoragePersistence();
 registerServiceWorker();

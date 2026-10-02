@@ -35,3 +35,12 @@ test('the beta copy is renamed "Hours Beta"', () => {
   const manifest = JSON.parse(markManifest(readFileSync(new URL('manifest.webmanifest', root), 'utf8')));
   assert.equal(manifest.short_name, 'Hours Beta');
 });
+
+test('every saved-data name goes through storageKey()', async () => {
+  // A hard-coded name would be shared by the real app and the test copy.
+  const { readdirSync } = await import('node:fs');
+  const offenders = readdirSync(new URL('src/', root))
+    .filter((f) => f.endsWith('.js') && f !== 'env.js')
+    .filter((f) => /['"`]hours-tracker(-beta)?:/.test(readFileSync(new URL(`src/${f}`, root), 'utf8')));
+  assert.deepEqual(offenders, [], `Use storageKey() instead of a hard-coded name in: ${offenders.join(', ')}`);
+});

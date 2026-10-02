@@ -77,10 +77,10 @@ export function formatClock(ms) {
   return `${h}:${pad2(m)}:${pad2(s)}`;
 }
 
-/** 29100000 -> "8:05". Rounds to the nearest minute. Used for totals and CSV. */
+/** 29100000 -> "8:05". Rounds to the nearest minute. Hours over 999 get commas ("1,412:05"). */
 export function formatHM(ms) {
   const minutes = Math.max(0, Math.round(ms / MINUTE));
-  return `${Math.floor(minutes / 60)}:${pad2(minutes % 60)}`;
+  return `${Math.floor(minutes / 60).toLocaleString('en-US')}:${pad2(minutes % 60)}`;
 }
 
 /** 29100000 -> "8.08". Decimal hours, handy for timesheets and spreadsheets. */
@@ -134,6 +134,12 @@ export function timeOnOrAfter(baseMs, text) {
   return d.getTime();
 }
 
+/** Nearest 15 minutes: 5:07 PM -> 5:00 PM, 5:08 PM -> 5:15 PM. */
+export function roundToQuarterHour(ms) {
+  const quarter = 15 * MINUTE;
+  return Math.round(ms / quarter) * quarter;
+}
+
 /** Drop the seconds, so "7:00:40" counts as at-or-after "7:00". */
 export function startOfMinute(ms) {
   return Math.floor(ms / MINUTE) * MINUTE;
@@ -157,7 +163,13 @@ export function formatShortDay(ms) {
   return `${DAY_NAMES[d.getDay()]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
 }
 
-const FULL_MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** "Sep 28". */
+export function formatMonthDay(ms) {
+  const d = new Date(ms);
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
+}
+
+const FULL_MONTH_NAMES =['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** "October 2026". */
 export function formatMonthHeading(ms) {
