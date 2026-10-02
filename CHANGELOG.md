@@ -6,6 +6,12 @@ Each pull request that changes the app adds a section at the top with a new vers
 
 Sections use these headings: **Added** (new features), **Changed** (existing features that work differently), **Fixed** (bugs), **Removed**.
 
+## [0.3.1] - 2026-10-02
+
+### Added
+
+- A test copy of the app at https://badger-one.github.io/hours-tracker/beta/ ("Hours Beta", orange icon and BETA strip) for trying changes before they reach the real app. It keeps its own data, separate from the real app's.
+
 ## [0.3.0] - 2026-10-02
 
 ### Changed

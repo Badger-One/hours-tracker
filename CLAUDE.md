@@ -32,3 +32,11 @@ Skylar is new to programming and has intermediate Git/GitHub knowledge (branches
 2. Add a `## [x.y.z] - YYYY-MM-DD` section at the top of `CHANGELOG.md` with Added / Changed / Fixed / Removed lists, written for Skylar (what changed on screen, not code details).
 3. Fill in the PR template, pasting the changelog section under "Changelog".
 4. On merge, `.github/workflows/release.yml` creates GitHub Release `vx.y.z` from that section. The PR check in `test.yml` fails if app files changed without a version and changelog bump.
+
+## Beta first, then ship
+
+`.github/workflows/pages.yml` publishes `main` at `/hours-tracker/` and the `beta` branch at `/hours-tracker/beta/` (falls back to main). `tools/mark-beta.js` renames that copy "Hours Beta" with orange icons; `src/env.js` gives it separate storage keys and the BETA strip. Every saved key must go through `storageKey()`.
+
+- **Changes Skylar will see** (anything on screen or in behavior): open the PR, wait for checks, `git push --force origin <branch>:beta`, and ask Skylar to try it in Hours Beta. Merge only after Skylar says to ship it. Then `git push --force origin main:beta`.
+- **Behind-the-scenes changes** (workflows, tests, docs, tooling, nothing visible): merge once checks pass.
+- Several approved changes can wait on beta and ship together. To stack them, branch the next change from the previous one and push the newest to beta.

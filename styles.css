@@ -57,6 +57,17 @@ h1 { font-size: 28px; margin: 8px 0 16px; }
 h2 { font-size: 18px; margin: 0 0 6px; }
 p { margin: 0 0 12px; color: var(--muted); }
 
+/* ---- Test copy ---- */
+
+.beta-strip {
+  background: #f97316;
+  color: #1c0d00;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 12px;
+}
+
 /* ---- Clock screen ---- */
 
 .status-pill {

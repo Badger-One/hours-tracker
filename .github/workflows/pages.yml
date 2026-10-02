@@ -1,0 +1,56 @@
+name: Publish site
+
+# Publishes two copies of the app to GitHub Pages:
+#   https://badger-one.github.io/hours-tracker/        the real app, from the main branch
+#   https://badger-one.github.io/hours-tracker/beta/   the test copy, from the beta branch
+#                                                      (or from main when there is no beta branch)
+# Runs whenever either branch changes.
+
+on:
+  push:
+    branches: [main, beta]
+  delete:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Build the site folder
+        run: |
+          mkdir -p _site/beta
+          git archive origin/main | tar -x -C _site
+          if git rev-parse --verify --quiet origin/beta > /dev/null; then
+            echo "Beta copy from the beta branch ($(git rev-parse --short origin/beta))"
+            git archive origin/beta | tar -x -C _site/beta
+          else
+            echo "No beta branch; beta copy is the same as main"
+            git archive origin/main | tar -x -C _site/beta
+          fi
+          node tools/mark-beta.js _site/beta
+          echo "Real app version: $(grep -o "'[0-9.]*'" _site/src/version.js)"
+          echo "Beta version:     $(grep -o "'[0-9.]*'" _site/beta/src/version.js)"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

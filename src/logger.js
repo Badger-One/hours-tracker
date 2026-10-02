@@ -10,7 +10,9 @@
 //
 // Event names are "area.action" in lowercase so they are easy to search for.
 
-const STORAGE_KEY = 'hours-tracker:logs:v1';
+import { storageKey } from './env.js';
+
+const STORAGE_KEY = storageKey('logs:v1');
 const MAX_ENTRIES = 2000;
 const LEVELS = ['debug', 'info', 'warn', 'error'];
 

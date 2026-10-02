@@ -18,9 +18,10 @@
 
 import { log } from './logger.js';
 import { newId } from './ids.js';
+import { storageKey } from './env.js';
 import { HOUR, MINUTE, formatDayHeading, formatTimeOfDay, formatWhen } from './time.js';
 
-export const STORAGE_KEY = 'hours-tracker:data:v1';
+export const STORAGE_KEY = storageKey('data:v1');
 const DEFAULT_JOB = 'Work';
 export const MAX_SCHEDULE_AHEAD_MS = 24 * HOUR;
 export const LONG_SHIFT_MS = 16 * HOUR;

@@ -3,6 +3,7 @@
 // can be tested without a browser; this file should stay mostly "glue".
 
 import { APP_VERSION } from './version.js';
+import { IS_BETA } from './env.js';
 import { initLogger, log, installGlobalErrorHandlers, getLogs, clearLogs, logsAsText, formatLogEntry, flushLogs } from './logger.js';
 import * as store from './store.js';
 import {
@@ -21,6 +22,7 @@ initLogger({ storage });
 installGlobalErrorHandlers(window);
 log.info('app.start', {
   version: APP_VERSION,
+  beta: IS_BETA,
   standalone: window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true,
   userAgent: navigator.userAgent,
   url: location.href,
@@ -783,6 +785,7 @@ function registerServiceWorker() {
     .catch((error) => log.warn('sw.register.failed', { error }));
 }
 
+$('beta-strip').hidden = !IS_BETA;
 wireUp();
 render();
 checkStoragePersistence();
