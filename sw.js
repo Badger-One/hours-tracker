@@ -9,7 +9,7 @@
 
 // The real app and the test copy (/beta/) share one website, so each names its
 // cache after its own folder and only clears out its own old caches.
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v10';
 const CACHE = `${self.registration.scope}|${CACHE_VERSION}`;
 const NETWORK_TIMEOUT_MS = 3000;
 
@@ -22,6 +22,7 @@ const APP_FILES = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'src/app.js',
+  'src/confirm.js',
   'src/csv.js',
   'src/env.js',
   'src/exporter.js',
