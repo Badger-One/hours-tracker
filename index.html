@@ -126,7 +126,7 @@
   <dialog id="dlg-time" class="sheet">
     <form method="dialog" id="form-time">
       <div class="sheet-bar">
-        <button type="button" id="dlg-time-cancel" class="bar-button">Cancel</button>
+        <button type="button" id="dlg-time-cancel" class="bar-button cancel">Cancel</button>
         <!-- autofocus here stops iOS from opening the date picker on its own. -->
         <h2 id="dlg-time-title" tabindex="-1" autofocus></h2>
         <button type="submit" id="dlg-time-ok" class="bar-button strong"></button>
@@ -144,7 +144,7 @@
   <dialog id="dlg-shift" class="sheet">
     <form method="dialog" id="form-shift">
       <div class="sheet-bar">
-        <button type="button" id="btn-shift-cancel" class="bar-button">Cancel</button>
+        <button type="button" id="btn-shift-cancel" class="bar-button cancel">Cancel</button>
         <h2 id="dlg-shift-title" tabindex="-1" autofocus>Edit shift</h2>
         <button type="submit" id="btn-shift-save" class="bar-button strong">Save</button>
       </div>
@@ -155,6 +155,7 @@
         <label class="field" id="shift-end-field"><span>End</span><input id="shift-end" type="time"></label>
       </div>
       <p id="shift-running-note" class="hint" hidden>Still running. Use Clock Out on the Clock tab to end it.</p>
+      <p id="shift-origin" class="hint"></p>
 
       <p id="shift-summary" class="summary"></p>
       <ul id="shift-errors" class="form-error" role="alert"></ul>

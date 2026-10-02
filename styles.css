@@ -11,6 +11,11 @@
   --break-soft: #fbead3;
   --danger: #b42318;
   --radius: 14px;
+  /* Filled button colors. Same in light and dark mode, picked so their text stays readable. */
+  --go: #0f766e;      /* green: Start Work, End Break, Save */
+  --pause: #f5b800;   /* yellow: Start Break */
+  --pause-text: #241a00;
+  --stop: #c62828;    /* red: Clock Out, Cancel */
   color-scheme: light dark;
 }
 
@@ -107,7 +112,7 @@ body[data-status="break"] .hero-time { color: var(--break); }
   padding: 14px 18px;
   border: 0;
   border-radius: var(--radius);
-  background: var(--work);
+  background: var(--go);
   color: #fff;
   font: inherit;
   font-size: 18px;
@@ -116,7 +121,8 @@ body[data-status="break"] .hero-time { color: var(--break); }
   cursor: pointer;
 }
 .button:active { opacity: 0.8; }
-.button.break { background: var(--break); }
+.button.break { background: var(--pause); color: var(--pause-text); }
+.button.stop { background: var(--stop); }
 .button.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
 .button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
 .button.small { min-height: 40px; padding: 8px 12px; font-size: 15px; width: auto; }
@@ -178,24 +184,35 @@ select, input[type="text"] {
 
 /* ---- History ---- */
 
-.day { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
-.day-head { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 4px; }
-.day-head .total { font-variant-numeric: tabular-nums; color: var(--work); }
-.shift-line { display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+/* One card per month, one line per shift. */
+.month { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; overflow: hidden; }
+.month-head { display: flex; justify-content: space-between; font-weight: 700; padding: 12px 14px 8px; }
+.month-head .total { font-variant-numeric: tabular-nums; color: var(--work); }
 .empty { text-align: center; padding: 40px 0; }
 
-.shift-line.tap {
+.shift-row {
+  display: grid;
+  grid-template-columns: 6.4em minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
   width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
   border: 0;
+  border-top: 1px solid var(--border);
   background: none;
+  color: var(--text);
   font: inherit;
-  font-size: 14px;
-  padding: 6px 0;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
   text-align: left;
   cursor: pointer;
 }
-.shift-line.tap:active { opacity: 0.6; }
-.tag { font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--border); margin-left: 6px; }
+.shift-row:active { background: var(--bg); }
+.shift-row .day-name { font-weight: 600; white-space: nowrap; }
+/* Too long to fit? End it with "…" instead of wrapping. */
+.shift-row .times { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shift-row .worked { font-weight: 600; text-align: right; }
 
 .title-row { display: flex; justify-content: space-between; align-items: center; }
 
@@ -258,23 +275,28 @@ body[data-status="scheduled"] .status-pill { background: var(--work-soft); color
 /* Cancel / title / Save across the top, like Apple's own apps. */
 .sheet-bar {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  margin: -6px -6px 4px;
+  gap: 10px;
+  margin-bottom: 4px;
 }
-.sheet-bar h2 { font-size: 17px; text-align: center; outline: none; }
+.sheet-bar h2 { font-size: 16px; line-height: 1.25; text-align: center; outline: none; }
 .bar-button {
+  min-width: 92px;
+  min-height: 48px;
+  padding: 10px 16px;
   border: 0;
-  background: none;
-  color: var(--work);
+  border-radius: 12px;
   font: inherit;
   font-size: 17px;
-  padding: 8px 6px;
-  justify-self: start;
+  font-weight: 700;
+  color: #fff;
   cursor: pointer;
 }
-.bar-button.strong { font-weight: 700; justify-self: end; }
-.bar-button:disabled { color: var(--muted); opacity: 0.5; }
+.bar-button:active { opacity: 0.8; }
+.bar-button.cancel { background: var(--stop); }
+.bar-button.strong { background: var(--go); }
+.bar-button:disabled { background: var(--border); color: var(--muted); }
 
 .date-time { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; }
 .date-time.three { grid-template-columns: 1.4fr 1fr 1fr; }

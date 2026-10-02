@@ -151,6 +151,20 @@ export function formatWhen(ms, now) {
   return `${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${formatTimeOfDay(ms)}`;
 }
 
+/** "Thu, Oct 1". */
+export function formatShortDay(ms) {
+  const d = new Date(ms);
+  return `${DAY_NAMES[d.getDay()]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
+}
+
+const FULL_MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** "October 2026". */
+export function formatMonthHeading(ms) {
+  const d = new Date(ms);
+  return `${FULL_MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 /** "Thu, Oct 1, 2026". */
 export function formatDayHeading(ms) {
   const d = new Date(ms);

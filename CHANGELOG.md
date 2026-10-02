@@ -6,6 +6,15 @@ Each pull request that changes the app adds a section at the top with a new vers
 
 Sections use these headings: **Added** (new features), **Changed** (existing features that work differently), **Fixed** (bugs), **Removed**.
 
+## [0.3.0] - 2026-10-02
+
+### Changed
+
+- History shows one line per shift: date, start and end time, and hours worked. Times too long for the screen end in "…". Shifts are grouped by month, with the month's total hours in the heading. Break totals no longer show in the list; open a shift to see its breaks.
+- Popups have large filled buttons: a red **Cancel** and a green **Start**, **Save**, **Clock out**, and so on.
+- **Clock Out** is red and **Start Break** is yellow. **Cancel** on a scheduled start is red.
+- The "edited" and "added" tags moved from the History list into the shift editor, which now says when a shift was edited, added by hand, or imported.
+
 ## [0.2.1] - 2026-10-02
 
 ### Changed

@@ -7,7 +7,7 @@ import { initLogger, log, installGlobalErrorHandlers, getLogs, clearLogs, logsAs
 import * as store from './store.js';
 import {
   MINUTE, HOUR, totalsForDay, workedMs, breakMs, startOfDay, startOfMinute,
-  formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading, formatWhen,
+  formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading, formatWhen, formatShortDay, formatMonthHeading,
   toTimeInput, fromDateAndTime, timeOnOrAfter,
 } from './time.js';
 import { importFiles } from './importers.js';
@@ -243,6 +243,13 @@ function openShiftEditor(shift) {
   $('shift-end-field').hidden = editing.running;
   $('shift-end-field').parentElement.classList.toggle('running', editing.running);
   $('shift-running-note').hidden = !editing.running;
+  const origin = shift?.editedAt
+    ? `Edited ${formatWhen(shift.editedAt, now)}.`
+    : shift?.source === 'manual' ? 'Added by hand.'
+    : shift?.source === 'import' ? 'Imported from a CSV file.'
+    : '';
+  $('shift-origin').textContent = origin;
+  $('shift-origin').hidden = !origin;
   $('btn-shift-delete').hidden = editing.isNew;
   $('btn-shift-delete').textContent = editing.running ? 'Delete this shift (cancel clock-in)' : 'Delete shift';
 
@@ -392,15 +399,15 @@ const BUTTONS = {
   off: [{ label: 'Start Work', cls: '', run: () => act('startWork', store.startWork, (now) => `Clocked in at ${formatTimeOfDay(now)}`) }],
   scheduled: [
     { label: 'Start Now', cls: '', run: () => act('startScheduledNow', store.startScheduledNow, (now) => `Clocked in at ${formatTimeOfDay(now)}`) },
-    { label: 'Cancel', cls: 'secondary', run: cancelScheduled },
+    { label: 'Cancel', cls: 'stop', run: cancelScheduled },
   ],
   working: [
     { label: 'Start Break', cls: 'break', run: () => act('startBreak', store.startBreak, (now) => `Break started at ${formatTimeOfDay(now)}`) },
-    { label: 'Clock Out', cls: 'secondary', run: () => act('clockOut', store.clockOut, clockedOutMessage) },
+    { label: 'Clock Out', cls: 'stop', run: () => act('clockOut', store.clockOut, clockedOutMessage) },
   ],
   break: [
     { label: 'End Break', cls: '', run: () => act('endBreak', store.endBreak, (now) => `Back to work at ${formatTimeOfDay(now)}`) },
-    { label: 'Clock Out', cls: 'secondary', run: () => act('clockOut', store.clockOut, clockedOutMessage) },
+    { label: 'Clock Out', cls: 'stop', run: () => act('clockOut', store.clockOut, clockedOutMessage) },
   ],
 };
 
@@ -487,41 +494,50 @@ function renderClock() {
 
 // ---- History screen ----
 
+/**
+ * One line per shift, newest first, grouped into a card per month:
+ *
+ *   October 2026                      8:07
+ *   Thu, Oct 1   8:00 AM to 5:07 PM   8:07
+ *
+ * A day with two shifts shows its date on the first line only.
+ * Tap a line to edit that shift.
+ */
 function renderHistory() {
   const now = Date.now();
-  const byDay = new Map();
-  for (const s of state.shifts) {
-    const day = startOfDay(s.start);
-    if (!byDay.has(day)) byDay.set(day, []);
-    byDay.get(day).push(s);
-  }
-  const days = [...byDay.keys()].sort((a, b) => b - a);
   const box = $('history');
-  if (days.length === 0) {
+  const shifts = [...state.shifts].sort((a, b) => b.start - a.start);
+  if (shifts.length === 0) {
     box.innerHTML = '<p class="empty">No shifts yet. Tap Start Work on the Clock tab, or import a CSV from More.</p>';
     return;
   }
 
+  const months = new Map(); // "2026-10" -> shifts in that month, newest first
+  for (const s of shifts) {
+    const key = formatDate(s.start).slice(0, 7);
+    if (!months.has(key)) months.set(key, []);
+    months.get(key).push(s);
+  }
+
   box.replaceChildren(
-    ...days.map((day) => {
-      const shifts = byDay.get(day).sort((a, b) => a.start - b.start);
-      const worked = shifts.reduce((sum, s) => sum + workedMs(s, now), 0);
-      const el = document.createElement('div');
-      el.className = 'day';
-      el.innerHTML = `
-        <div class="day-head"><span>${formatDayHeading(day)}</span><span class="total">${formatHM(worked)}</span></div>
-        ${shifts
-          .map((s) => {
+    ...[...months.values()].map((list) => {
+      const total = list.reduce((sum, s) => sum + workedMs(s, now), 0);
+      const card = document.createElement('div');
+      card.className = 'month';
+      card.innerHTML = `
+        <div class="month-head"><span>${formatMonthHeading(list[0].start)}</span><span class="total">${formatHM(total)}</span></div>
+        ${list
+          .map((s, i) => {
+            const sameDayAsAbove = i > 0 && startOfDay(list[i - 1].start) === startOfDay(s.start);
             const end = s.end == null ? (s.start > now ? 'scheduled' : 'now') : formatTimeOfDay(s.end);
-            const br = breakMs(s, now);
-            const tag = s.editedAt ? '<span class="tag">edited</span>' : s.source === 'manual' ? '<span class="tag">added</span>' : '';
-            return `<button type="button" class="shift-line tap" data-id="${s.id}">
-              <span>${formatTimeOfDay(s.start)} to ${end}${tag}</span>
-              <span>${formatHM(br) !== '0:00' ? `break ${formatHM(br)} · ` : ''}${formatHM(workedMs(s, now))}</span>
+            return `<button type="button" class="shift-row" data-id="${s.id}">
+              <span class="day-name">${sameDayAsAbove ? '' : formatShortDay(s.start)}</span>
+              <span class="times">${formatTimeOfDay(s.start)} to ${end}</span>
+              <span class="worked">${formatHM(workedMs(s, now))}</span>
             </button>`;
           })
           .join('')}`;
-      return el;
+      return card;
     }),
   );
 }
