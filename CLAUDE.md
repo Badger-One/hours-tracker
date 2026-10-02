@@ -22,5 +22,13 @@ Skylar is new to programming and has intermediate Git/GitHub knowledge (branches
 - Show problems to the user (alert or on-screen text) instead of failing silently.
 - When adding a file under `src/` or `icons/`, add it to `APP_FILES` in `sw.js`. `tests/sw.test.js` enforces this.
 - If the saved data shape changes, bump `schema` in `store.js` and migrate old data in `loadState`.
-- Bump `src/version.js` on every user-visible change.
+- Shift rules (no overlaps, breaks inside shifts, no future end times) live in `validateShift` in `store.js`. Every action that changes a shift must go through it.
+- Clock actions and edits go through `perform()` in `app.js` so they get an Undo bar.
 - Run `npm test` before committing.
+
+## Releasing (every PR that changes the app)
+
+1. Bump the version in `src/version.js` and `package.json` (minor for features, patch for fixes).
+2. Add a `## [x.y.z] - YYYY-MM-DD` section at the top of `CHANGELOG.md` with Added / Changed / Fixed / Removed lists, written for Skylar (what changed on screen, not code details).
+3. Fill in the PR template, pasting the changelog section under "Changelog".
+4. On merge, `.github/workflows/release.yml` creates GitHub Release `vx.y.z` from that section. The PR check in `test.yml` fails if app files changed without a version and changelog bump.

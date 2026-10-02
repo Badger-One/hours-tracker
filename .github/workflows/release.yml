@@ -1,0 +1,32 @@
+name: Release
+
+# After a merge to main: if src/version.js has a version with no GitHub Release yet,
+# create one (tag vX.Y.Z) using that version's CHANGELOG.md section as the notes.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Create the release if this version is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -e "import('./src/version.js').then(m => console.log(m.APP_VERSION))")
+          if gh release view "v$version" > /dev/null 2>&1; then
+            echo "Release v$version already exists. Nothing to do."
+            exit 0
+          fi
+          node tools/changelog-notes.js "$version" > notes.md
+          gh release create "v$version" --title "v$version" --notes-file notes.md --target "$GITHUB_SHA"
+          echo "Created release v$version."

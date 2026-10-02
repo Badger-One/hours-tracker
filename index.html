@@ -20,6 +20,11 @@
   <main>
     <!-- Clock: the main screen -->
     <section id="view-clock" class="view">
+      <div id="long-shift-banner" class="banner" hidden>
+        <p id="long-shift-text"></p>
+        <button id="btn-banner-clockout" class="button small break">Clock out at…</button>
+      </div>
+
       <p id="status" class="status-pill">Off the clock</p>
 
       <div class="hero">
@@ -48,11 +53,15 @@
       </div>
 
       <div id="actions" class="actions"></div>
+      <div id="more-actions" class="link-row"></div>
     </section>
 
-    <!-- History: past shifts by day -->
+    <!-- History: past shifts by day. Tap a shift to edit it. -->
     <section id="view-history" class="view" hidden>
-      <h1>History</h1>
+      <div class="title-row">
+        <h1>History</h1>
+        <button id="btn-add-shift" class="button small secondary">Add shift</button>
+      </div>
       <div id="history"></div>
     </section>
 
@@ -110,6 +119,55 @@
       <p class="footer">Version <span id="app-version"></span> · Storage: <span id="storage-status">checking</span></p>
     </section>
   </main>
+
+  <!-- Pick one time: Start at…, Clock out at…, Break at…, End break at… -->
+  <dialog id="dlg-time" class="sheet">
+    <form method="dialog" id="form-time">
+      <h2 id="dlg-time-title"></h2>
+      <p id="dlg-time-help"></p>
+      <input id="dlg-time-input" type="datetime-local" required>
+      <div id="dlg-time-chips" class="chips"></div>
+      <p id="dlg-time-error" class="form-error" role="alert"></p>
+      <div class="sheet-buttons">
+        <button type="button" id="dlg-time-cancel" class="button secondary">Cancel</button>
+        <button type="submit" id="dlg-time-ok" class="button"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Edit (or add) a whole shift -->
+  <dialog id="dlg-shift" class="sheet">
+    <form method="dialog" id="form-shift">
+      <h2 id="dlg-shift-title">Edit shift</h2>
+      <label class="field"><span>Job</span><input id="shift-job" type="text" autocomplete="off"></label>
+      <label class="field"><span>Start</span><input id="shift-start" type="datetime-local" required></label>
+      <label class="field" id="shift-end-field"><span>End</span><input id="shift-end" type="datetime-local"></label>
+      <p id="shift-running-note" class="hint" hidden>Still running. Use Clock Out on the Clock tab to end it.</p>
+
+      <div class="field">
+        <span>Breaks</span>
+        <div id="shift-breaks"></div>
+        <button type="button" id="btn-add-break" class="button small secondary">Add break</button>
+      </div>
+
+      <label class="field"><span>Note</span><textarea id="shift-note" rows="2"></textarea></label>
+
+      <p id="shift-summary" class="summary"></p>
+      <ul id="shift-errors" class="form-error" role="alert"></ul>
+
+      <div class="sheet-buttons">
+        <button type="button" id="btn-shift-cancel" class="button secondary">Cancel</button>
+        <button type="submit" id="btn-shift-save" class="button">Save</button>
+      </div>
+      <button type="button" id="btn-shift-delete" class="button danger">Delete shift</button>
+    </form>
+  </dialog>
+
+  <!-- "Clocked out at 4:02 PM. Undo" -->
+  <div id="toast" class="toast" hidden>
+    <span id="toast-text"></span>
+    <button id="toast-undo" type="button">Undo</button>
+  </div>
 
   <nav class="tabbar">
     <button data-view="clock" aria-current="page">Clock</button>

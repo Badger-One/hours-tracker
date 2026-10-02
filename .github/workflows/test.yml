@@ -14,3 +14,26 @@ jobs:
         with:
           node-version: 24
       - run: npm test
+
+  # On pull requests: if the app itself changed, the version and changelog must change too.
+  changelog:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require a version bump and changelog entry for app changes
+        run: |
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          echo "Changed files:"; echo "$changed"
+          if echo "$changed" | grep -qE '^(src/|index\.html$|styles\.css$|sw\.js$|manifest\.webmanifest$|icons/)'; then
+            missing=""
+            echo "$changed" | grep -qx 'CHANGELOG.md' || missing="$missing CHANGELOG.md"
+            echo "$changed" | grep -qx 'src/version.js' || missing="$missing src/version.js"
+            if [ -n "$missing" ]; then
+              echo "::error::This pull request changes the app but not:$missing. Add a new version section to CHANGELOG.md and bump src/version.js and package.json."
+              exit 1
+            fi
+          fi
+          echo "Changelog check passed."
