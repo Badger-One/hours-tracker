@@ -7,7 +7,7 @@
 // If you add a file the app needs, add it to APP_FILES too.
 // tests/sw.test.js fails if this list and the real files drift apart.
 
-const CACHE = 'hours-tracker-v3';
+const CACHE = 'hours-tracker-v4';
 const NETWORK_TIMEOUT_MS = 3000;
 
 const APP_FILES = [
