@@ -555,3 +555,30 @@ details.card[open] summary { margin-bottom: 8px; }
 .job-choices.with-current .button:not(.selected) { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
 
 #shift-job { width: 100%; }
+
+/* ---- Pay ---- */
+
+.earned-card { margin: -10px 0 20px; }
+.earned-card .stat-value { color: var(--work); }
+.earned-sub { color: var(--muted); font-size: 13px; }
+.earned-sub:empty { display: none; }
+
+.rate-row { display: grid; grid-template-columns: 1fr 1.2fr auto; gap: 6px; align-items: center; margin-bottom: 8px; }
+.rate-row input { min-width: 0; }
+.rate-row .remove { border: 0; background: none; color: var(--danger); font-size: 22px; padding: 4px 8px; }
+.money-input { position: relative; }
+.money-input::before { content: "$"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.money-input input { padding-left: 22px !important; width: 100%; }
+.sheet input[type="number"] {
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+.check { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text) !important; font-size: 16px !important; }
+.check input { width: 22px; height: 22px; }
+.ot-fields { display: grid; gap: 8px; color: var(--text); }
+.ot-fields input { width: 5.5em; }
+.ot-fields select { padding: 8px 10px; }

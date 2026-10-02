@@ -7,7 +7,7 @@ import { IS_BETA, storageKey } from './env.js';
 import { initLogger, log, installGlobalErrorHandlers, getLogs, clearLogs, logsAsText, formatLogEntry, flushLogs } from './logger.js';
 import * as store from './store.js';
 import {
-  MINUTE, HOUR, totalsForDay, workedMs, breakMs, startOfDay, startOfMinute,
+  MINUTE, HOUR, totalsForDay, workedMs, breakMs, startOfDay, startOfNextDay, startOfMinute,
   formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading, formatWhen, formatShortDay, formatMonthHeading, formatMonthDay,
   toTimeInput, fromDateAndTime, timeOnOrAfter, roundToQuarterHour,
 } from './time.js';
@@ -16,6 +16,10 @@ import { buildHistory } from './history.js';
 import { backupDue, recordBackup, dismissBackupForToday } from './backup.js';
 import * as jobs from './jobs.js';
 import { typedConfirmation } from './confirm.js';
+import {
+  payForJob, hourlyShiftPay, groupPay, earnedToday, formatMoney, describePay, validatePay,
+  DEFAULT_OVERTIME, DEFAULT_EXPECTED_WEEKLY_HOURS,
+} from './pay.js';
 import { buildExportCsv, backupFileName } from './exporter.js';
 import { saveFile } from './files.js';
 
@@ -578,6 +582,14 @@ function renderClock() {
   $('stat-break').textContent = formatClock(thisBreak);
   $('stat-break-today').textContent = formatClock(today.breakMs);
 
+  const anyPay = state.jobs.some((j) => payForJob(state, j.name));
+  $('earned-card').hidden = !anyPay;
+  if (anyPay) {
+    const earned = earnedToday(state, now, hourlyShiftPay(state, now));
+    $('stat-earned').textContent = formatMoney(earned.amount);
+    $('earned-sub').textContent = earned.salaryRate != null ? `Salary works out to ${formatMoney(earned.salaryRate)}/hr this week` : '';
+  }
+
   const showBackup = backupDue(state, now);
   $('backup-banner').hidden = !showBackup;
   if (showBackup) $('backup-sub').textContent = lastBackupText(now);
@@ -653,13 +665,13 @@ function daysSummary(t) {
   return `${t.daysWorked} day${t.daysWorked === 1 ? '' : 's'} · avg ${formatHM(t.avgPerDayMs)}`;
 }
 
-function groupHeading({ key, openByDefault, cls, label, totals }) {
+function groupHeading({ key, openByDefault, cls, label, totals, money = '' }) {
   const open = isOpen(key, openByDefault);
   return `<button type="button" class="${cls}" data-toggle="${key}" data-default-open="${openByDefault}" aria-expanded="${open}">
     <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
     <span class="label">${label}</span>
     <span class="total">${formatHM(totals.workedMs)}</span>
-    <span class="sub">${daysSummary(totals)}</span>
+    <span class="sub">${daysSummary(totals)}${money ? ` · ${money}` : ''}</span>
   </button>`;
 }
 
@@ -672,13 +684,14 @@ function shiftRow(s, showDate, now) {
   </button>`;
 }
 
-function monthBody(month, now) {
+function monthBody(month, now, moneyFor) {
   return month.weeks
     .map((week) => {
+      const money = moneyFor(week.start, startOfNextDay(week.end), 'week');
       const rows = week.shifts
         .map((s, i) => shiftRow(s, i === 0 || startOfDay(week.shifts[i - 1].start) !== startOfDay(s.start), now))
         .join('');
-      return `<div class="week-head"><span>${formatMonthDay(week.start)} to ${formatMonthDay(week.end)}</span><span>${formatHM(week.fullWeekMs)}</span></div>${rows}`;
+      return `<div class="week-head"><span>${formatMonthDay(week.start)} to ${formatMonthDay(week.end)}</span><span>${formatHM(week.fullWeekMs)}${money ? ` · ${money}` : ''}</span></div>${rows}`;
     })
     .join('');
 }
@@ -740,6 +753,18 @@ function renderHistory() {
   const shown = renderJobFilter();
   const years = buildHistory(shown, now, { weekStartsOn: state.settings.weekStartsOn ?? 1 });
 
+  // Pay for a period, from the shifts on screen: "$3,420", or "$6,667 · $41.67/hr" with a salary.
+  const hourly = hourlyShiftPay(state, now);
+  const moneyFor = (from, to, kind) => {
+    const g = groupPay(state, shown.filter((s) => s.start >= from && s.start < to), from, to, kind, hourly, now);
+    if (!g.hasPay) return '';
+    return formatMoney(g.amount, { cents: false }) + (g.effectiveRate != null ? ` · ${formatMoney(g.effectiveRate)}/hr` : '');
+  };
+  const monthRange = (key) => {
+    const [y, m] = key.split('-').map(Number);
+    return [new Date(y, m - 1, 1).getTime(), new Date(y, m, 1).getTime()];
+  };
+
   box.innerHTML = years
     .map((y) => {
       const yearKey = `year-${y.year}`;
@@ -748,13 +773,13 @@ function renderHistory() {
             .map((m) => {
               const openByDefault = false;
               return `<div class="month">
-                ${groupHeading({ key: m.key, openByDefault, cls: 'month-head', label: formatMonthHeading(m.start), totals: m })}
-                ${isOpen(m.key, openByDefault) ? monthBody(m, now) : ''}
+                ${groupHeading({ key: m.key, openByDefault, cls: 'month-head', label: formatMonthHeading(m.start), totals: m, money: moneyFor(...monthRange(m.key), 'month') })}
+                ${isOpen(m.key, openByDefault) ? monthBody(m, now, moneyFor) : ''}
               </div>`;
             })
             .join('')
         : '';
-      return `<section class="year">${groupHeading({ key: yearKey, openByDefault: false, cls: 'year-head', label: y.year, totals: y })}${months}</section>`;
+      return `<section class="year">${groupHeading({ key: yearKey, openByDefault: false, cls: 'year-head', label: y.year, totals: y, money: moneyFor(new Date(y.year, 0, 1).getTime(), new Date(y.year + 1, 0, 1).getTime(), 'year') })}${months}</section>`;
     })
     .join('');
 }
@@ -839,10 +864,16 @@ function renderJobsSettings() {
     ? state.jobs
         .map((j) => {
           const name = escapeHtml(j.name);
-          const note = j.archived ? 'Hidden. Past shifts stay in History.' : j.name === fallback && active.length > 1 ? 'Default job' : '';
+          const notes = [];
+          if (j.archived) notes.push('Hidden. Past shifts stay in History.');
+          else if (j.name === fallback && active.length > 1) notes.push('Default job');
+          const payText = describePay(payForJob(state, j.name), Date.now());
+          if (payText) notes.push(payText);
+          const note = notes.join(' · ');
           const buttons = j.archived
             ? `<button type="button" data-action="restore" data-name="${name}">Show</button>`
-            : `<button type="button" data-action="rename" data-name="${name}">Rename</button>
+            : `<button type="button" data-action="pay" data-name="${name}">Pay</button>
+               <button type="button" data-action="rename" data-name="${name}">Rename</button>
                <button type="button" class="remove-job" data-action="remove" data-name="${name}">Remove</button>`;
           return `<li class="${j.archived ? 'hidden-job' : ''}"><span class="job-name">${name}${note ? `<small>${note}</small>` : ''}</span>${buttons}</li>`;
         })
@@ -866,7 +897,9 @@ function onJobAction(event) {
   const name = button.dataset.name;
   const action = button.dataset.action;
   try {
-    if (action === 'rename') {
+    if (action === 'pay') {
+      openPayEditor(name);
+    } else if (action === 'rename') {
       const newName = prompt('New name for this job:', name);
       if (newName == null || newName.trim() === name) return;
       let changed = 0;
@@ -883,6 +916,116 @@ function onJobAction(event) {
     log.warn('action.rejected', { action: `job.${action}`, message: error.message });
     alert(error.message);
   }
+}
+
+// ---- Pay editor ----
+
+let payEditing = null; // { job, defaultFrom, rows: [{ amount, from }] }
+
+function openPayEditor(jobName) {
+  const pay = payForJob(state, jobName);
+  const firstShift = Math.min(...state.shifts.filter((s) => s.job === jobName).map((s) => s.start));
+  const defaultFrom = formatDate(Number.isFinite(firstShift) ? firstShift : Date.now());
+  const ot = pay?.overtime ?? DEFAULT_OVERTIME;
+  payEditing = {
+    job: jobName,
+    defaultFrom,
+    rows: pay ? [...pay.rates].sort((a, b) => a.from.localeCompare(b.from)) : [{ amount: '', from: defaultFrom }],
+  };
+  $('dlg-pay-title').textContent = jobName;
+  $('pay-type').value = pay?.type ?? '';
+  $('pay-per').value = pay?.per ?? 'year';
+  // Overtime starts on for a job that isn't hourly yet; an hourly job keeps its own choice.
+  $('pay-ot-enabled').checked = pay?.type === 'hourly' ? !!pay.overtime?.enabled : true;
+  $('pay-ot-threshold').value = ot.threshold;
+  $('pay-ot-per').value = ot.per;
+  $('pay-ot-multiplier').value = ot.multiplier;
+  $('pay-expected').value = pay?.expectedWeeklyHours ?? DEFAULT_EXPECTED_WEEKLY_HOURS;
+  renderRateRows();
+  updatePayForm();
+  log.debug('dialog.pay.open', { job: jobName });
+  $('dlg-pay').showModal();
+}
+
+function renderRateRows() {
+  $('pay-rates').replaceChildren(
+    ...payEditing.rows.map((row, i) => {
+      const el = document.createElement('div');
+      el.className = 'rate-row';
+      el.innerHTML = `
+        <span class="money-input"><input type="number" class="r-amount" inputmode="decimal" min="0" step="0.01" aria-label="Rate ${i + 1} amount" value="${row.amount ?? ''}"></span>
+        <input type="date" class="r-from" aria-label="Rate ${i + 1} start date" value="${row.from ?? ''}">
+        <button type="button" class="remove" aria-label="Remove rate ${i + 1}">×</button>`;
+      el.querySelector('.remove').hidden = payEditing.rows.length === 1;
+      el.querySelector('.remove').addEventListener('click', () => {
+        payEditing.rows = readRateRows();
+        payEditing.rows.splice(i, 1);
+        renderRateRows();
+        updatePayForm();
+      });
+      return el;
+    }),
+  );
+}
+
+function readRateRows() {
+  return [...$('pay-rates').querySelectorAll('.rate-row')].map((el) => ({
+    amount: el.querySelector('.r-amount').value === '' ? '' : Number(el.querySelector('.r-amount').value),
+    from: el.querySelector('.r-from').value,
+  }));
+}
+
+/** The pay setup as typed, or null for "No pay set". */
+function readPayDraft() {
+  const type = $('pay-type').value;
+  if (!type) return null;
+  const rates = readRateRows().map((r) => ({ from: r.from, amount: r.amount === '' ? NaN : r.amount }));
+  if (type === 'hourly') {
+    return {
+      type,
+      rates,
+      overtime: {
+        enabled: $('pay-ot-enabled').checked,
+        threshold: Number($('pay-ot-threshold').value),
+        per: $('pay-ot-per').value,
+        multiplier: Number($('pay-ot-multiplier').value),
+      },
+    };
+  }
+  return { type, per: $('pay-per').value, rates, expectedWeeklyHours: Number($('pay-expected').value) };
+}
+
+function updatePayForm() {
+  const type = $('pay-type').value;
+  $('pay-details').hidden = !type;
+  $('pay-per-field').hidden = type !== 'salary';
+  $('pay-hourly-options').hidden = type !== 'hourly';
+  $('pay-salary-options').hidden = type !== 'salary';
+  $('pay-ot-fields').hidden = !$('pay-ot-enabled').checked;
+  $('pay-rates-label').textContent =
+    type === 'hourly' ? 'Dollars per hour' : $('pay-per').value === 'month' ? 'Dollars per month' : 'Dollars per year';
+  const problems = validatePay(readPayDraft());
+  $('pay-errors').replaceChildren(...problems.map((p) => Object.assign(document.createElement('li'), { textContent: p })));
+  $('dlg-pay-save').disabled = problems.length > 0;
+}
+
+function addRateRow() {
+  payEditing.rows = readRateRows();
+  const last = payEditing.rows.at(-1);
+  payEditing.rows.push({ amount: last?.amount ?? '', from: formatDate(Date.now()) });
+  renderRateRows();
+  updatePayForm();
+}
+
+function onPaySubmit(event) {
+  event.preventDefault();
+  const draft = readPayDraft();
+  if (draft) draft.rates.sort((a, b) => a.from.localeCompare(b.from));
+  const problems = validatePay(draft);
+  if (problems.length) return updatePayForm();
+  const name = payEditing.job;
+  perform('setPay', (s) => jobs.setJobPay(s, name, draft), draft ? `Pay saved for ${name}.` : `Pay removed for ${name}.`);
+  $('dlg-pay').close();
 }
 
 function addJobFromPrompt() {
@@ -1039,6 +1182,11 @@ function wireUp() {
     renderSettings();
   });
   $('dlg-job-cancel').addEventListener('click', () => $('dlg-job').close());
+  $('form-pay').addEventListener('submit', onPaySubmit);
+  $('form-pay').addEventListener('input', updatePayForm);
+  $('form-pay').addEventListener('change', updatePayForm);
+  $('dlg-pay-cancel').addEventListener('click', () => $('dlg-pay').close());
+  $('btn-add-rate').addEventListener('click', addRateRow);
   $('log-level').addEventListener('change', renderLogView);
   $('btn-export-logs').addEventListener('click', exportLogs);
   $('btn-clear-logs').addEventListener('click', () => {

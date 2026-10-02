@@ -131,3 +131,12 @@ export function jobsInShifts(shifts) {
   for (const s of shifts) if (s.job && !names.some((n) => sameName(n, s.job))) names.push(s.job);
   return names;
 }
+
+/** Set (or clear, with null) a job's pay setup. See pay.js for its shape. */
+export function setJobPay(state, name, pay) {
+  const job = findJob(state, name);
+  if (!job) throw new Error('That job no longer exists.');
+  if (pay) job.pay = pay;
+  else delete job.pay;
+  log.info('jobs.pay', { job: job.name, type: pay?.type ?? 'none', rates: pay?.rates.length ?? 0 });
+}

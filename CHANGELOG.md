@@ -6,6 +6,18 @@ Each pull request that changes the app adds a section at the top with a new vers
 
 Sections use these headings: **Added** (new features), **Changed** (existing features that work differently), **Fixed** (bugs), **Removed**.
 
+## [0.8.0] - 2026-10-02
+
+### Added
+
+- **Pay for each job** (Settings > Jobs > **Pay**): **Hourly** or **Salary**, with rates that start on a date. **Add raise** adds a new rate; shifts before a raise keep the old rate.
+- **Salary per year or per month.** Per month suits fixed monthly pay like military pay: each month shows exactly that amount.
+- **Overtime** for hourly jobs, set per job: after a number of hours per week or per day, at a multiplier (1.5 for time and a half). On by default at 40 hours a week.
+- **History** shows pay next to hours on every year, month, and week. Salaried jobs also show what the pay works out to per hour worked, for example "$4,500 · $28.95/hr". The period you're in counts salary only through today.
+- **Earned today** on the Clock tab, counting up every second while you work. For a salary it counts up until you reach your expected hours for the week, then shows what your salary works out to per hour as you keep working.
+
+Pay settings are saved on your phone but aren't in CSV backups yet.
+
 ## [0.7.1] - 2026-10-02
 
 ### Changed
