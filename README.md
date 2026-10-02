@@ -11,7 +11,7 @@ It's a web app you add to your home screen. It runs full screen with its own ico
 - **History tab.** Every shift grouped by day, with worked time and breaks.
 - **Export CSV.** Every finished shift as a spreadsheet file. The file is also a full backup: import it to restore.
 - **Import CSV.** Reads Hours Tracker (Cribasoft) exports and this app's own exports. You can pick several files at once and review what's in them before anything is added.
-- **Debug log.** The app records what it does (More > Debug log). Export the log when something looks wrong.
+- **Debug log.** The app records what it does (Settings > Debug log). Export the log when something looks wrong.
 
 ## Install it on your iPhone
 
@@ -23,7 +23,7 @@ It's a web app you add to your home screen. It runs full screen with its own ico
 ## Move your history from Hours Tracker
 
 1. In Hours Tracker, export your data as CSV and save the files to the Files app (iCloud Drive or On My iPhone).
-2. Open this app **from the home screen icon**, go to **More > Import**, and tap **Choose CSV files**.
+2. Open this app **from the home screen icon**, go to **Settings > Import**, and tap **Choose CSV files**.
 3. Select all the files. You'll get a summary per file: how many shifts are new, how many are already in the app, and any notes about lines it had to adjust or skip.
 4. Tap **Import**. If the result looks wrong, tap **Undo last import**.
 
@@ -64,7 +64,7 @@ The tests check the time math, CSV reading and writing, the Hours Tracker import
 
 1. Make a branch: `git switch -c my-change`
 2. Edit files. Use `npm start` to look at the result and `npm test` to check nothing broke.
-3. Pick a new version number and put it in `src/version.js` and `package.json`. Raise the middle number for new features (0.2.0 to 0.3.0) and the last number for fixes (0.2.0 to 0.2.1). The number shows on the More screen, so you can tell when your phone has the new version.
+3. Pick a new version number and put it in `src/version.js` and `package.json`. Raise the middle number for new features (0.2.0 to 0.3.0) and the last number for fixes (0.2.0 to 0.2.1). The number shows at the bottom of the Settings screen, so you can tell when your phone has the new version.
 4. Add a section for that version at the top of [CHANGELOG.md](CHANGELOG.md) listing what changed.
 5. Commit, push, and open a pull request. The pull request form has a Changelog section; paste the same notes there.
 6. Try it in the test copy first (see below).
