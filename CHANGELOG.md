@@ -14,6 +14,10 @@ Sections use these headings: **Added** (new features), **Changed** (existing fea
 - The banner's **×** hides it until tomorrow, with **Undo** in case you tap it by mistake.
 - Settings shows when you last backed up, and **Back up now** there counts as today's backup too.
 
+### Fixed
+
+- Saving a backup or log to Files no longer creates a second, text-only file containing the file name.
+
 ## [0.5.0] - 2026-10-02
 
 ### Changed
