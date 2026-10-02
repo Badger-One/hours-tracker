@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Hours">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>Hours Tracker</title>
+  <script type="module" src="src/app.js"></script>
+</head>
+<body data-status="off">
+  <main>
+    <!-- Clock: the main screen -->
+    <section id="view-clock" class="view">
+      <p id="status" class="status-pill">Off the clock</p>
+
+      <div class="hero">
+        <div id="hero-label" class="hero-label">Worked today</div>
+        <div id="hero-time" class="hero-time">0:00:00</div>
+        <div id="since" class="since"></div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-label">This session</span>
+          <span id="stat-session" class="stat-value">0:00:00</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Worked today</span>
+          <span id="stat-today" class="stat-value">0:00:00</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">This break</span>
+          <span id="stat-break" class="stat-value">0:00:00</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Breaks today</span>
+          <span id="stat-break-today" class="stat-value">0:00:00</span>
+        </div>
+      </div>
+
+      <div id="actions" class="actions"></div>
+    </section>
+
+    <!-- History: past shifts by day -->
+    <section id="view-history" class="view" hidden>
+      <h1>History</h1>
+      <div id="history"></div>
+    </section>
+
+    <!-- More: import, export, settings, debug -->
+    <section id="view-more" class="view" hidden>
+      <h1>More</h1>
+
+      <div class="card">
+        <h2>Export</h2>
+        <p>Saves every finished shift as a CSV file. This is also your backup: keep a copy in Files or iCloud Drive.</p>
+        <button id="btn-export" class="button">Export CSV</button>
+      </div>
+
+      <div class="card">
+        <h2>Import</h2>
+        <p>Pick one or more CSV files exported from Hours Tracker (Cribasoft) or from this app. You'll see what's in them before anything is added.</p>
+        <label class="button secondary">
+          Choose CSV files
+          <input id="import-input" class="visually-hidden" type="file" accept=".csv,text/csv,text/plain" multiple>
+        </label>
+        <div id="import-preview"></div>
+        <button id="btn-undo-import" class="button secondary" hidden>Undo last import</button>
+      </div>
+
+      <div class="card">
+        <h2>Settings</h2>
+        <label class="field">
+          <span>Job name for new shifts</span>
+          <input id="setting-job" type="text" autocomplete="off">
+        </label>
+      </div>
+
+      <div class="card">
+        <h2>Debug log</h2>
+        <p>A record of what the app did, kept on this phone. Export it when something looks wrong.</p>
+        <div class="row">
+          <select id="log-level" aria-label="Show log entries at or above">
+            <option value="debug">All</option>
+            <option value="info" selected>Info and up</option>
+            <option value="warn">Warnings and errors</option>
+            <option value="error">Errors only</option>
+          </select>
+          <button id="btn-export-logs" class="button secondary small">Export log</button>
+          <button id="btn-clear-logs" class="button secondary small">Clear</button>
+        </div>
+        <pre id="log-view" class="log-view"></pre>
+      </div>
+
+      <div class="card danger">
+        <h2>Delete all data</h2>
+        <p>Removes every shift from this phone. Export first if you want a copy.</p>
+        <button id="btn-wipe" class="button danger">Delete all data</button>
+      </div>
+
+      <p class="footer">Version <span id="app-version"></span> · Storage: <span id="storage-status">checking</span></p>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <button data-view="clock" aria-current="page">Clock</button>
+    <button data-view="history">History</button>
+    <button data-view="more">More</button>
+  </nav>
+</body>
+</html>

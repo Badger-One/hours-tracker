@@ -1,0 +1,8 @@
+# Your real time data stays out of the repo. Test files live in tests/fixtures/.
+*.csv
+!tests/fixtures/*.csv
+*.txt
+
+node_modules/
+.DS_Store
+Thumbs.db
