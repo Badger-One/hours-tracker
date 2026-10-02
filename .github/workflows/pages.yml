@@ -61,6 +61,9 @@ jobs:
             git archive origin/main | tar -x -C _site/beta
           fi
           node tools/mark-beta.js _site/beta
+          # Build stamps: the app reloads when the published stamp changes (see checkForUpdate in app.js).
+          git rev-parse origin/main > _site/build.txt
+          (git rev-parse --verify --quiet origin/beta || git rev-parse origin/main) > _site/beta/build.txt
           echo "Real app version: $(grep -o "'[0-9.]*'" _site/src/version.js)"
           echo "Beta version:     $(grep -o "'[0-9.]*'" _site/beta/src/version.js)"
 
