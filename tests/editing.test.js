@@ -2,7 +2,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { initLogger, getLogs } from '../src/logger.js';
 import * as store from '../src/store.js';
-import { MINUTE, HOUR, toDateTimeInput, fromDateTimeInput, toTimeInput, timeOnOrAfter, formatWhen } from '../src/time.js';
+import { MINUTE, HOUR, fromDateAndTime, toTimeInput, timeOnOrAfter, formatWhen } from '../src/time.js';
 
 const at = (y, mo, d, h, mi = 0, s = 0) => new Date(y, mo - 1, d, h, mi, s).getTime();
 const NOW = at(2026, 10, 2, 12, 0);
@@ -22,11 +22,19 @@ function withYesterday() {
 
 // ---- Form input helpers ----
 
-test('datetime-local and time input conversions', () => {
-  assert.equal(toDateTimeInput(at(2026, 1, 5, 7, 3)), '2026-01-05T07:03');
-  assert.equal(fromDateTimeInput('2026-01-05T07:03'), at(2026, 1, 5, 7, 3));
-  assert.equal(fromDateTimeInput(''), null);
+test('date and time input conversions', () => {
+  assert.equal(fromDateAndTime('2026-01-05', '07:03'), at(2026, 1, 5, 7, 3));
+  assert.equal(fromDateAndTime('2026-01-05', ''), null);
+  assert.equal(fromDateAndTime('', '07:03'), null);
   assert.equal(toTimeInput(at(2026, 1, 5, 19, 45)), '19:45');
+});
+
+test('an end time earlier in the day than the start lands on the next day', () => {
+  // How the shift editor reads Start 10:00 PM, End 02:00 with one date.
+  const start = fromDateAndTime('2026-10-01', '22:00');
+  assert.equal(timeOnOrAfter(start, '02:00'), at(2026, 10, 2, 2));
+  // The same time as the start means a zero-length shift, which the rules then refuse.
+  assert.equal(timeOnOrAfter(start, '22:00'), start);
 });
 
 test('break times land on the right day, including after midnight', () => {

@@ -120,29 +120,44 @@
     </section>
   </main>
 
-  <!-- Pick one time: Start at…, Clock out at…, Break at…, End break at… -->
+  <!-- Pick one time: Start at…, Clock out at…, Break at…, End break at…
+       Cancel and the confirm button sit in the top bar, away from the iPhone's
+       date and time pickers, which pop up below the fields. -->
   <dialog id="dlg-time" class="sheet">
     <form method="dialog" id="form-time">
-      <h2 id="dlg-time-title"></h2>
-      <p id="dlg-time-help"></p>
-      <input id="dlg-time-input" type="datetime-local" required>
-      <div id="dlg-time-chips" class="chips"></div>
-      <p id="dlg-time-error" class="form-error" role="alert"></p>
-      <div class="sheet-buttons">
-        <button type="button" id="dlg-time-cancel" class="button secondary">Cancel</button>
-        <button type="submit" id="dlg-time-ok" class="button"></button>
+      <div class="sheet-bar">
+        <button type="button" id="dlg-time-cancel" class="bar-button">Cancel</button>
+        <!-- autofocus here stops iOS from opening the date picker on its own. -->
+        <h2 id="dlg-time-title" tabindex="-1" autofocus></h2>
+        <button type="submit" id="dlg-time-ok" class="bar-button strong"></button>
       </div>
+      <p id="dlg-time-help" class="hint"></p>
+      <div class="date-time">
+        <label class="field"><span>Date</span><input id="dlg-time-date" type="date" required></label>
+        <label class="field"><span>Time</span><input id="dlg-time-time" type="time" required></label>
+      </div>
+      <p id="dlg-time-error" class="form-error" role="alert"></p>
     </form>
   </dialog>
 
   <!-- Edit (or add) a whole shift -->
   <dialog id="dlg-shift" class="sheet">
     <form method="dialog" id="form-shift">
-      <h2 id="dlg-shift-title">Edit shift</h2>
-      <label class="field"><span>Job</span><input id="shift-job" type="text" autocomplete="off"></label>
-      <label class="field"><span>Start</span><input id="shift-start" type="datetime-local" required></label>
-      <label class="field" id="shift-end-field"><span>End</span><input id="shift-end" type="datetime-local"></label>
+      <div class="sheet-bar">
+        <button type="button" id="btn-shift-cancel" class="bar-button">Cancel</button>
+        <h2 id="dlg-shift-title" tabindex="-1" autofocus>Edit shift</h2>
+        <button type="submit" id="btn-shift-save" class="bar-button strong">Save</button>
+      </div>
+
+      <div class="date-time three">
+        <label class="field"><span>Date</span><input id="shift-date" type="date" required></label>
+        <label class="field"><span>Start</span><input id="shift-start" type="time" required></label>
+        <label class="field" id="shift-end-field"><span>End</span><input id="shift-end" type="time"></label>
+      </div>
       <p id="shift-running-note" class="hint" hidden>Still running. Use Clock Out on the Clock tab to end it.</p>
+
+      <p id="shift-summary" class="summary"></p>
+      <ul id="shift-errors" class="form-error" role="alert"></ul>
 
       <div class="field">
         <span>Breaks</span>
@@ -150,16 +165,10 @@
         <button type="button" id="btn-add-break" class="button small secondary">Add break</button>
       </div>
 
+      <label class="field"><span>Job</span><input id="shift-job" type="text" autocomplete="off"></label>
       <label class="field"><span>Note</span><textarea id="shift-note" rows="2"></textarea></label>
 
-      <p id="shift-summary" class="summary"></p>
-      <ul id="shift-errors" class="form-error" role="alert"></ul>
-
-      <div class="sheet-buttons">
-        <button type="button" id="btn-shift-cancel" class="button secondary">Cancel</button>
-        <button type="submit" id="btn-shift-save" class="button">Save</button>
-      </div>
-      <button type="button" id="btn-shift-delete" class="button danger">Delete shift</button>
+      <button type="button" id="btn-shift-delete" class="button danger delete-shift">Delete shift</button>
     </form>
   </dialog>
 
