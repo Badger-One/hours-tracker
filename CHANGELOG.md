@@ -23,6 +23,7 @@ Pay settings are saved on your phone but aren't in CSV backups yet.
 ### Changed
 
 - **Undo last import** asks twice: first a confirmation showing how many shifts it removes, then you type **undo** (any capitals) before anything is removed.
+- Undoing an import also removes any job the import created that no longer has shifts.
 
 ## [0.7.0] - 2026-10-02
 

@@ -328,7 +328,7 @@ export function deleteShift(state, id) {
 export function applyImport(state, result, now) {
   state.shifts.push(...result.shifts);
   sortShifts(state);
-  rememberJobs(state, result.shifts);
+  rememberJobs(state, result.shifts, { importBatch: result.batchId });
   state.lastImport = { batchId: result.batchId, at: now, count: result.shifts.length };
   log.info('import.applied', { batchId: result.batchId, added: result.shifts.length, totalShifts: state.shifts.length });
 }
@@ -340,7 +340,12 @@ export function undoLastImport(state) {
   const before = state.shifts.length;
   state.shifts = state.shifts.filter((s) => s.importBatch !== batch);
   const removed = before - state.shifts.length;
+  // Jobs this import created and that no longer have any shifts go too.
+  const leftover = (job) => job.importBatch === batch && !job.pay && !state.shifts.some((s) => s.job === job.name);
+  const removedJobs = state.jobs.filter(leftover).map((j) => j.name);
+  state.jobs = state.jobs.filter((j) => !leftover(j));
+  if (removedJobs.includes(state.settings.defaultJob)) state.settings.defaultJob = state.jobs.find((j) => !j.archived)?.name ?? null;
   state.lastImport = null;
-  log.info('import.undone', { batchId: batch, removed });
+  log.info('import.undone', { batchId: batch, removed, removedJobs });
   return removed;
 }
