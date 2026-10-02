@@ -55,15 +55,6 @@ test('actions that make no sense right now are refused with a clear message', ()
   assert.throws(() => store.startBreak(s, 4), /already on a break/);
 });
 
-test('job name: settings, then most recent shift, then "Work"', () => {
-  const s = store.emptyState();
-  assert.equal(store.effectiveJob(s), 'Work');
-  s.shifts.push({ job: 'Tech Support', start: 0, end: 1, breaks: [] });
-  assert.equal(store.effectiveJob(s), 'Tech Support');
-  s.settings.job = '  Help Desk ';
-  assert.equal(store.effectiveJob(s), 'Help Desk');
-});
-
 test('save and load round trip', () => {
   const storage = memoryStorage();
   const s = store.emptyState();

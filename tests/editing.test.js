@@ -189,10 +189,11 @@ test('very long shifts get a warning, not an error', () => {
 
 test('add a missed shift', () => {
   const s = withYesterday();
+  s.jobs = [{ name: 'Tech', archived: false }];
   store.addShift(s, { job: '', start: at(2026, 9, 30, 8), end: at(2026, 9, 30, 16), breaks: [], note: '' }, NOW);
   assert.equal(s.shifts.length, 2);
   assert.equal(s.shifts[0].source, 'manual');
-  assert.equal(s.shifts[0].job, 'Tech', 'blank job uses the usual job');
+  assert.equal(s.shifts[0].job, 'Tech', 'blank job uses the default job');
   assert.throws(() => store.addShift(s, { start: at(2026, 9, 30, 9), end: at(2026, 9, 30, 10), breaks: [] }, NOW), /Overlaps/);
 });
 

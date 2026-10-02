@@ -36,6 +36,9 @@
 
 * { box-sizing: border-box; }
 
+/* Anything marked hidden stays hidden, even if a layout rule (like .field { display: grid }) says otherwise. */
+[hidden] { display: none !important; }
+
 html, body { margin: 0; }
 
 /* No double-tap zoom: two quick taps on a heading should open and close it, not zoom.
@@ -494,3 +497,61 @@ details.card[open] summary { margin-bottom: 8px; }
   cursor: pointer;
 }
 .last-backup { margin: 8px 0 0; }
+
+/* ---- Jobs ---- */
+
+.jobs-list { list-style: none; margin: 0 0 12px; padding: 0; }
+.jobs-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--border);
+}
+.jobs-list li:last-child { border-bottom: 0; }
+.jobs-list .job-name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.jobs-list .job-name small { display: block; color: var(--muted); font-weight: 400; font-size: 13px; }
+.jobs-list li.hidden-job .job-name { color: var(--muted); }
+.jobs-list button {
+  border: 0;
+  background: none;
+  color: var(--work);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 6px;
+  cursor: pointer;
+}
+.jobs-list button.remove-job { color: var(--danger); }
+
+.bar-spacer { min-width: 92px; }
+.job-choices { display: grid; gap: 10px; }
+.job-choices .button { text-align: left; }
+.job-choices .button small { display: block; font-size: 13px; font-weight: 500; opacity: 0.85; }
+
+.current-job { color: var(--text); font-weight: 700; margin-bottom: 4px; overflow-wrap: anywhere; }
+
+/* History job filter: "Filter jobs" (smaller, up to 45% wide) and "All jobs" (bigger) side by side. */
+.job-filter { display: grid; grid-template-columns: fit-content(45%) minmax(0, 1fr); gap: 8px; margin: 0 0 14px; }
+.job-filter[hidden] { display: none; }
+.job-filter button {
+  flex: none;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.job-filter button[aria-pressed="true"] { background: var(--go); border-color: var(--go); color: #fff; }
+.job-filter .filter-button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-filter .filter-button::after { content: " ▾"; }
+/* The current choice in a pick-one popup. */
+.job-choices.with-current .button.selected { outline: 3px solid var(--text); outline-offset: 2px; }
+.job-choices.with-current .button:not(.selected) { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+
+#shift-job { width: 100%; }
