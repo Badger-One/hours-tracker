@@ -453,3 +453,44 @@ details.card[open] summary::after { content: "Hide"; }
 details.card summary h3 { margin: 0; }
 details.card[open] summary { margin-bottom: 8px; }
 .tabbar button { font-size: 12px; }
+
+/* ---- Daily backup banner (Clock tab) ---- */
+
+.backup-banner {
+  display: flex;
+  align-items: stretch;
+  margin-top: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.backup-banner[hidden] { display: none; }
+.backup-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.backup-main:active { background: var(--bg); }
+.backup-main strong { display: block; font-size: 16px; }
+.backup-sub { display: block; color: var(--muted); font-size: 13px; }
+.backup-icon { width: 30px; height: 30px; flex: none; fill: none; stroke: var(--work); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.backup-dismiss {
+  width: 52px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  font-size: 24px;
+  cursor: pointer;
+}
+.last-backup { margin: 8px 0 0; }
