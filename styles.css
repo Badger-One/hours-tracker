@@ -195,11 +195,48 @@ select, input[type="text"] {
 
 /* ---- History ---- */
 
-/* One card per month, one line per shift. */
-.month { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; overflow: hidden; }
-.month-head { display: flex; justify-content: space-between; font-weight: 700; padding: 12px 14px 8px; }
-.month-head .total { font-variant-numeric: tabular-nums; color: var(--work); }
+/* Years hold month cards; month cards hold weeks and shift lines.
+   Year and month headings are buttons that open and close them. */
+.year { margin-bottom: 22px; }
 .empty { text-align: center; padding: 40px 0; }
+.month { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+
+.year-head,
+.month-head {
+  display: grid;
+  grid-template-columns: 1.1em minmax(0, 1fr) auto;
+  column-gap: 6px;
+  align-items: baseline;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.year-head { padding: 4px 4px 10px; }
+.month-head { padding: 12px 14px; }
+.year-head:active, .month-head:active { opacity: 0.6; }
+.year-head .label { font-size: 22px; font-weight: 800; }
+.year-head .total { font-size: 20px; font-weight: 800; color: var(--work); }
+.month-head .label, .month-head .total { font-weight: 700; }
+.month-head .total { color: var(--work); }
+.chev { color: var(--muted); font-size: 14px; }
+.sub { grid-column: 2 / 4; color: var(--muted); font-size: 13px; }
+
+.week-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 14px 6px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 
 .shift-row {
   display: grid;

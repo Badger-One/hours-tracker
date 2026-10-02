@@ -5,7 +5,7 @@
 //   {
 //     schema: 1,
 //     shifts: [ { id, job, start, end, breaks: [ { start, end } ], note, source, importBatch?, editedAt? } ],
-//     settings: { job },
+//     settings: { job, weekStartsOn },   // weekStartsOn: 0 = Sunday, 1 = Monday
 //     lastImport: { batchId, at, count } | null
 //   }
 //
@@ -27,7 +27,7 @@ export const MAX_SCHEDULE_AHEAD_MS = 24 * HOUR;
 export const LONG_SHIFT_MS = 16 * HOUR;
 
 export function emptyState() {
-  return { schema: 1, shifts: [], settings: { job: '' }, lastImport: null };
+  return { schema: 1, shifts: [], settings: { job: '', weekStartsOn: 1 }, lastImport: null };
 }
 
 /** Read saved data. If it is damaged, keep a copy for recovery and start empty instead of crashing. */

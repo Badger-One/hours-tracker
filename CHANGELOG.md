@@ -6,6 +6,19 @@ Each pull request that changes the app adds a section at the top with a new vers
 
 Sections use these headings: **Added** (new features), **Changed** (existing features that work differently), **Fixed** (bugs), **Removed**.
 
+## [0.4.0] - 2026-10-02
+
+### Added
+
+- History groups shifts by year, then month, then week. Tap a year or month heading to open or close it. Closed months show only their totals, so you can compare months at a glance. The current month starts open; what you open or close is remembered.
+- Each year and month heading shows days worked and average hours per day worked, for example "20 days · avg 7:46".
+- Open months show a total for each week. A week that crosses into the next month shows its full-week total in both months.
+- **Week starts on** setting (Monday or Sunday) under More > Settings.
+
+### Changed
+
+- Totals over 999 hours have commas, for example "1,330:42".
+
 ## [0.3.1] - 2026-10-02
 
 ### Added

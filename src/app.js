@@ -3,15 +3,16 @@
 // can be tested without a browser; this file should stay mostly "glue".
 
 import { APP_VERSION } from './version.js';
-import { IS_BETA } from './env.js';
+import { IS_BETA, storageKey } from './env.js';
 import { initLogger, log, installGlobalErrorHandlers, getLogs, clearLogs, logsAsText, formatLogEntry, flushLogs } from './logger.js';
 import * as store from './store.js';
 import {
   MINUTE, HOUR, totalsForDay, workedMs, breakMs, startOfDay, startOfMinute,
-  formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading, formatWhen, formatShortDay, formatMonthHeading,
+  formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading, formatWhen, formatShortDay, formatMonthHeading, formatMonthDay,
   toTimeInput, fromDateAndTime, timeOnOrAfter,
 } from './time.js';
 import { importFiles } from './importers.js';
+import { buildHistory } from './history.js';
 import { buildExportCsv, exportFileName } from './exporter.js';
 import { saveFile } from './files.js';
 
@@ -496,52 +497,113 @@ function renderClock() {
 
 // ---- History screen ----
 
-/**
- * One line per shift, newest first, grouped into a card per month:
+/*
+ * Years, then months, then weeks, newest first. Each year and month heading is a
+ * button that opens or closes it. Closed months show only their totals, so you can
+ * compare months at a glance:
  *
- *   October 2026                      8:07
- *   Thu, Oct 1   8:00 AM to 5:07 PM   8:07
+ *   2026                                  1,412:05
+ *   180 days · avg 7:51
+ *   ▾ October 2026                            8:07
+ *     1 day · avg 8:07
+ *       Sep 28 to Oct 4                      40:12
+ *       Thu, Oct 1   8:00 AM to 5:07 PM       8:07
+ *   ▸ September 2026                        152:40
+ *     19 days · avg 8:02
  *
- * A day with two shifts shows its date on the first line only.
- * Tap a line to edit that shift.
+ * The current month and every year start open. What you open or close is
+ * remembered on this phone.
  */
+
+const UI_KEY = storageKey('ui:v1');
+let ui = loadUi();
+
+function loadUi() {
+  try {
+    const saved = JSON.parse(storage?.getItem(UI_KEY) ?? '{}');
+    return { open: saved.open ?? {} };
+  } catch {
+    return { open: {} };
+  }
+}
+
+function isOpen(key, openByDefault) {
+  return ui.open[key] ?? openByDefault;
+}
+
+function toggleGroup(key, openByDefault) {
+  ui.open[key] = !isOpen(key, openByDefault);
+  try {
+    storage?.setItem(UI_KEY, JSON.stringify(ui));
+  } catch {
+    // Only a display preference; fine to lose.
+  }
+  log.debug('history.toggle', { key, open: ui.open[key] });
+  renderHistory();
+}
+
+function daysSummary(t) {
+  if (t.daysWorked === 0) return 'No time worked yet';
+  return `${t.daysWorked} day${t.daysWorked === 1 ? '' : 's'} · avg ${formatHM(t.avgPerDayMs)}`;
+}
+
+function groupHeading({ key, openByDefault, cls, label, totals }) {
+  const open = isOpen(key, openByDefault);
+  return `<button type="button" class="${cls}" data-toggle="${key}" data-default-open="${openByDefault}" aria-expanded="${open}">
+    <span class="chev" aria-hidden="true">${open ? '▾' : '▸'}</span>
+    <span class="label">${label}</span>
+    <span class="total">${formatHM(totals.workedMs)}</span>
+    <span class="sub">${daysSummary(totals)}</span>
+  </button>`;
+}
+
+function shiftRow(s, showDate, now) {
+  const end = s.end == null ? (s.start > now ? 'scheduled' : 'now') : formatTimeOfDay(s.end);
+  return `<button type="button" class="shift-row" data-id="${s.id}">
+    <span class="day-name">${showDate ? formatShortDay(s.start) : ''}</span>
+    <span class="times">${formatTimeOfDay(s.start)} to ${end}</span>
+    <span class="worked">${formatHM(workedMs(s, now))}</span>
+  </button>`;
+}
+
+function monthBody(month, now) {
+  return month.weeks
+    .map((week) => {
+      const rows = week.shifts
+        .map((s, i) => shiftRow(s, i === 0 || startOfDay(week.shifts[i - 1].start) !== startOfDay(s.start), now))
+        .join('');
+      return `<div class="week-head"><span>${formatMonthDay(week.start)} to ${formatMonthDay(week.end)}</span><span>${formatHM(week.fullWeekMs)}</span></div>${rows}`;
+    })
+    .join('');
+}
+
 function renderHistory() {
   const now = Date.now();
   const box = $('history');
-  const shifts = [...state.shifts].sort((a, b) => b.start - a.start);
-  if (shifts.length === 0) {
+  if (state.shifts.length === 0) {
     box.innerHTML = '<p class="empty">No shifts yet. Tap Start Work on the Clock tab, or import a CSV from More.</p>';
     return;
   }
+  const thisMonth = formatDate(now).slice(0, 7);
+  const years = buildHistory(state.shifts, now, { weekStartsOn: state.settings.weekStartsOn ?? 1 });
 
-  const months = new Map(); // "2026-10" -> shifts in that month, newest first
-  for (const s of shifts) {
-    const key = formatDate(s.start).slice(0, 7);
-    if (!months.has(key)) months.set(key, []);
-    months.get(key).push(s);
-  }
-
-  box.replaceChildren(
-    ...[...months.values()].map((list) => {
-      const total = list.reduce((sum, s) => sum + workedMs(s, now), 0);
-      const card = document.createElement('div');
-      card.className = 'month';
-      card.innerHTML = `
-        <div class="month-head"><span>${formatMonthHeading(list[0].start)}</span><span class="total">${formatHM(total)}</span></div>
-        ${list
-          .map((s, i) => {
-            const sameDayAsAbove = i > 0 && startOfDay(list[i - 1].start) === startOfDay(s.start);
-            const end = s.end == null ? (s.start > now ? 'scheduled' : 'now') : formatTimeOfDay(s.end);
-            return `<button type="button" class="shift-row" data-id="${s.id}">
-              <span class="day-name">${sameDayAsAbove ? '' : formatShortDay(s.start)}</span>
-              <span class="times">${formatTimeOfDay(s.start)} to ${end}</span>
-              <span class="worked">${formatHM(workedMs(s, now))}</span>
-            </button>`;
-          })
-          .join('')}`;
-      return card;
-    }),
-  );
+  box.innerHTML = years
+    .map((y) => {
+      const yearKey = `year-${y.year}`;
+      const months = isOpen(yearKey, true)
+        ? y.months
+            .map((m) => {
+              const openByDefault = m.key === thisMonth;
+              return `<div class="month">
+                ${groupHeading({ key: m.key, openByDefault, cls: 'month-head', label: formatMonthHeading(m.start), totals: m })}
+                ${isOpen(m.key, openByDefault) ? monthBody(m, now) : ''}
+              </div>`;
+            })
+            .join('')
+        : '';
+      return `<section class="year">${groupHeading({ key: yearKey, openByDefault: true, cls: 'year-head', label: y.year, totals: y })}${months}</section>`;
+    })
+    .join('');
 }
 
 // ---- More screen ----
@@ -609,6 +671,7 @@ function renderMore() {
   const jobInput = $('setting-job');
   if (document.activeElement !== jobInput) jobInput.value = state.settings.job;
   jobInput.placeholder = store.effectiveJob(state);
+  $('setting-week-start').value = String(state.settings.weekStartsOn ?? 1);
 
   const undoImport = $('btn-undo-import');
   undoImport.hidden = !state.lastImport;
@@ -701,6 +764,8 @@ function wireUp() {
   // History
   $('btn-add-shift').addEventListener('click', () => openShiftEditor(null));
   $('history').addEventListener('click', (e) => {
+    const heading = e.target.closest('[data-toggle]');
+    if (heading) return toggleGroup(heading.dataset.toggle, heading.dataset.defaultOpen === 'true');
     const line = e.target.closest('[data-id]');
     if (line) openShiftEditor(store.findShift(state, line.dataset.id));
   });
@@ -714,6 +779,11 @@ function wireUp() {
     persist();
     render();
     alert(`Removed ${removed} shift${removed === 1 ? '' : 's'}.`);
+  });
+  $('setting-week-start').addEventListener('change', (e) => {
+    state.settings.weekStartsOn = Number(e.target.value);
+    log.info('settings.weekStartsOn', { weekStartsOn: state.settings.weekStartsOn });
+    persist();
   });
   $('setting-job').addEventListener('change', (e) => {
     state.settings.job = e.target.value.trim();
