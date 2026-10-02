@@ -31,6 +31,7 @@
       <p id="status" class="status-pill">Off the clock</p>
 
       <div class="hero">
+        <div id="current-job" class="current-job" hidden></div>
         <div id="hero-label" class="hero-label">Worked today</div>
         <div id="hero-time" class="hero-time">0:00:00</div>
         <div id="since" class="since"></div>
@@ -77,6 +78,7 @@
         <h1>History</h1>
         <button id="btn-add-shift" class="button small secondary">Add shift</button>
       </div>
+      <div id="job-filter" class="job-filter" hidden></div>
       <div id="history"></div>
     </section>
 
@@ -86,10 +88,22 @@
 
       <h2 class="group-title">Jobs</h2>
       <div class="card">
+        <ul id="jobs-list" class="jobs-list"></ul>
+        <button id="btn-add-job" class="button small secondary">Add job</button>
+      </div>
+      <div class="card">
         <label class="field">
-          <span>Job name for new shifts</span>
-          <input id="setting-job" type="text" autocomplete="off">
+          <span>When clocking in</span>
+          <select id="setting-job-mode">
+            <option value="default">Use the default job</option>
+            <option value="ask">Ask which job every time</option>
+          </select>
         </label>
+        <label class="field" id="default-job-field">
+          <span>Default job</span>
+          <select id="setting-default-job"></select>
+        </label>
+        <p id="job-mode-hint" class="hint"></p>
       </div>
 
       <h2 class="group-title">Backup &amp; data</h2>
@@ -193,10 +207,22 @@
         <button type="button" id="btn-add-break" class="button small secondary">Add break</button>
       </div>
 
-      <label class="field"><span>Job</span><input id="shift-job" type="text" autocomplete="off"></label>
+      <label class="field"><span>Job</span><select id="shift-job"></select></label>
       <label class="field"><span>Note</span><textarea id="shift-note" rows="2"></textarea></label>
 
       <button type="button" id="btn-shift-delete" class="button danger delete-shift">Delete shift</button>
+    </form>
+  </dialog>
+
+  <!-- "Which job?" on Start Work, when Settings says to ask -->
+  <dialog id="dlg-job" class="sheet">
+    <form method="dialog" id="form-job">
+      <div class="sheet-bar">
+        <button type="button" id="dlg-job-cancel" class="bar-button cancel">Cancel</button>
+        <h2 tabindex="-1" autofocus>Which job?</h2>
+        <span class="bar-spacer"></span>
+      </div>
+      <div id="dlg-job-list" class="job-choices"></div>
     </form>
   </dialog>
 

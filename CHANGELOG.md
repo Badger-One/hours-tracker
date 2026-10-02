@@ -6,6 +6,24 @@ Each pull request that changes the app adds a section at the top with a new vers
 
 Sections use these headings: **Added** (new features), **Changed** (existing features that work differently), **Fixed** (bugs), **Removed**.
 
+## [0.7.0] - 2026-10-02
+
+### Added
+
+- **Multiple jobs.** Settings > Jobs lists your jobs, with **Add job**, **Rename**, and **Remove**. Your existing job names come over from your past shifts automatically.
+- **When clocking in:** choose **Use the default job** (and which one) or **Ask which job every time**. Asking shows your jobs as big buttons when you tap Start Work or Start at; with only one job it never asks.
+- With 2 or more jobs, the Clock tab shows which job you're clocked into, and the clock-in message names it.
+- History gets a job filter (All jobs, then each job) when your shifts span 2 or more jobs. Picking a job makes every year, month, and week total that job's total.
+- The shift editor's Job field is a dropdown of your jobs.
+
+### Changed
+
+- Renaming a job renames it on all its past shifts. Removing a job that has past shifts hides it instead, keeping its history; **Show** brings it back. You always keep at least one job.
+
+### Fixed
+
+- The shift editor showed an End field for a shift that's still running. It's hidden now, as intended.
+
 ## [0.6.0] - 2026-10-02
 
 ### Added

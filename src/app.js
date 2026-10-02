@@ -14,6 +14,7 @@ import {
 import { importFiles } from './importers.js';
 import { buildHistory } from './history.js';
 import { backupDue, recordBackup, dismissBackupForToday } from './backup.js';
+import * as jobs from './jobs.js';
 import { buildExportCsv, backupFileName } from './exporter.js';
 import { saveFile } from './files.js';
 
@@ -159,15 +160,57 @@ function exactIfNow(at) {
   return at === startOfMinute(now) ? now : at;
 }
 
+// ---- Which job? ----
+
+let jobPicked = null;
+
+/**
+ * Calls `then(job)` with the job for a new shift. When Settings says "Ask which job
+ * every time" and you have 2+ jobs, it shows the job buttons first; otherwise it
+ * uses the default job right away.
+ */
+function chooseJob(then) {
+  if (!jobs.needsJobPick(state)) return then(jobs.defaultJob(state));
+  const fallback = jobs.defaultJob(state);
+  $('dlg-job-list').replaceChildren(
+    ...jobs.activeJobs(state).map((name) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'button';
+      b.textContent = name;
+      if (name === fallback) b.insertAdjacentHTML('beforeend', '<small>Default job</small>');
+      b.addEventListener('click', () => {
+        $('dlg-job').close();
+        log.info('jobs.picked', { job: name });
+        jobPicked(name);
+      });
+      return b;
+    }),
+  );
+  jobPicked = then;
+  $('dlg-job').showModal();
+}
+
+/** "Clocked in at 8:00 AM" plus the job name when you have more than one job. */
+function clockedInMessage(at, now, job) {
+  const base = at > now ? `Starting at ${formatWhen(at, now)}` : `Clocked in at ${formatWhen(at, now)}`;
+  return jobs.activeJobs(state).length > 1 ? `${base} · ${job}` : base;
+}
+
+function startWorkNow() {
+  chooseJob((job) => act('startWork', (s, now) => store.startWork(s, now, now, job), (now) => clockedInMessage(now, now, job)));
+}
+
 function pickStartTime() {
-  openTimePicker({
-    title: 'Start at',
-    help: 'Pick when your shift started, or a later time to clock in ahead.',
-    okLabel: 'Start',
-    onConfirm: (at) =>
-      perform('startWork', (s, now) => store.startWork(s, now, exactIfNow(at)), (now) =>
-        at > now ? `Starting at ${formatWhen(at, now)}` : `Clocked in at ${formatWhen(at, now)}`),
-  });
+  chooseJob((job) =>
+    openTimePicker({
+      title: 'Start at',
+      help: 'Pick when your shift started, or a later time to clock in ahead.',
+      okLabel: 'Start',
+      onConfirm: (at) =>
+        perform('startWork', (s, now) => store.startWork(s, now, exactIfNow(at), job), (now) => clockedInMessage(at, now, job)),
+    }),
+  );
 }
 
 function pickScheduledStart() {
@@ -231,7 +274,7 @@ function openShiftEditor(shift) {
       end: shift.end,
       rows: shift.breaks.map((b) => ({ start: b.start, end: b.end, running: b.end == null })),
     };
-    $('shift-job').value = shift.job;
+    fillJobSelect(shift.job);
     $('shift-note').value = shift.note ?? '';
   } else {
     // Start with yesterday, at the same times as your most recent shift rounded to the
@@ -248,7 +291,7 @@ function openShiftEditor(shift) {
     let end = last ? roundToQuarterHour(sameTimeYesterday(last.end)) : startOfDay(now) - 7 * HOUR;
     if (end <= start) end = start + 8 * HOUR; // The last shift crossed midnight.
     editing = { id: null, isNew: true, running: false, start, end, rows: [] };
-    $('shift-job').value = store.effectiveJob(state);
+    fillJobSelect(jobs.defaultJob(state));
     $('shift-note').value = '';
   }
 
@@ -273,6 +316,13 @@ function openShiftEditor(shift) {
   updateShiftPreview();
   log.debug('dialog.shift.open', { id: editing.id, isNew: editing.isNew, running: editing.running });
   $('dlg-shift').showModal();
+}
+
+/** The editor's Job dropdown: your jobs, plus this shift's job if it's hidden or not in the list. */
+function fillJobSelect(selected) {
+  const names = jobs.activeJobs(state);
+  if (selected && !names.includes(selected)) names.push(selected);
+  $('shift-job').replaceChildren(...names.map((n) => new Option(n, n, false, n === selected)));
 }
 
 function renderBreakRows() {
@@ -412,7 +462,7 @@ function deleteEditingShift() {
 // ---- Clock screen ----
 
 const BUTTONS = {
-  off: [{ label: 'Start Work', cls: '', run: () => act('startWork', store.startWork, (now) => `Clocked in at ${formatTimeOfDay(now)}`) }],
+  off: [{ label: 'Start Work', cls: '', run: startWorkNow }],
   scheduled: [
     { label: 'Start Now', cls: '', run: () => act('startScheduledNow', store.startScheduledNow, (now) => `Clocked in at ${formatTimeOfDay(now)}`) },
     { label: 'Cancel', cls: 'stop', run: cancelScheduled },
@@ -468,6 +518,10 @@ function renderClock() {
 
   const sessionWorked = shift ? workedMs(shift, now) : 0;
   const thisBreak = brk ? now - brk.start : 0;
+
+  const showJob = shift && jobs.activeJobs(state).length > 1;
+  $('current-job').hidden = !showJob;
+  if (showJob) $('current-job').textContent = shift.job;
 
   document.body.dataset.status = status;
   $('status').textContent = { off: 'Off the clock', scheduled: 'Scheduled', working: 'Working', break: 'On break' }[status];
@@ -538,9 +592,17 @@ let ui = loadUi();
 function loadUi() {
   try {
     const saved = JSON.parse(storage?.getItem(UI_KEY) ?? '{}');
-    return { open: saved.open ?? {} };
+    return { open: saved.open ?? {}, jobFilter: saved.jobFilter ?? null };
   } catch {
-    return { open: {} };
+    return { open: {}, jobFilter: null };
+  }
+}
+
+function saveUi() {
+  try {
+    storage?.setItem(UI_KEY, JSON.stringify(ui));
+  } catch {
+    // Only display preferences; fine to lose.
   }
 }
 
@@ -550,11 +612,7 @@ function isOpen(key, openByDefault) {
 
 function toggleGroup(key, openByDefault) {
   ui.open[key] = !isOpen(key, openByDefault);
-  try {
-    storage?.setItem(UI_KEY, JSON.stringify(ui));
-  } catch {
-    // Only a display preference; fine to lose.
-  }
+  saveUi();
   log.debug('history.toggle', { key, open: ui.open[key] });
   renderHistory();
 }
@@ -594,6 +652,38 @@ function monthBody(month, now) {
     .join('');
 }
 
+/**
+ * With shifts from 2+ jobs, History shows a row of buttons (All jobs, then each job).
+ * Picking a job shows only its shifts, so every total becomes that job's total.
+ * Returns the shifts to show. The choice is remembered on this phone.
+ */
+function renderJobFilter() {
+  const names = jobs.jobsInShifts(state.shifts);
+  const box = $('job-filter');
+  if (names.length < 2) {
+    box.hidden = true;
+    return state.shifts;
+  }
+  const current = names.includes(ui.jobFilter) ? ui.jobFilter : null;
+  box.hidden = false;
+  box.replaceChildren(
+    ...[null, ...names].map((name) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = name ?? 'All jobs';
+      b.setAttribute('aria-pressed', String(name === current));
+      b.addEventListener('click', () => {
+        ui.jobFilter = name;
+        saveUi();
+        log.debug('history.jobFilter', { job: name });
+        renderHistory();
+      });
+      return b;
+    }),
+  );
+  return current ? state.shifts.filter((s) => s.job === current) : state.shifts;
+}
+
 function renderHistory() {
   const now = Date.now();
   const box = $('history');
@@ -601,7 +691,8 @@ function renderHistory() {
     box.innerHTML = '<p class="empty">No shifts yet. Tap Start Work on the Clock tab, or import a CSV in Settings.</p>';
     return;
   }
-  const years = buildHistory(state.shifts, now, { weekStartsOn: state.settings.weekStartsOn ?? 1 });
+  const shown = renderJobFilter();
+  const years = buildHistory(shown, now, { weekStartsOn: state.settings.weekStartsOn ?? 1 });
 
   box.innerHTML = years
     .map((y) => {
@@ -685,9 +776,7 @@ function confirmImport() {
 function renderSettings() {
   $('app-version').textContent = APP_VERSION;
   $('last-backup').textContent = lastBackupText(Date.now());
-  const jobInput = $('setting-job');
-  if (document.activeElement !== jobInput) jobInput.value = state.settings.job;
-  jobInput.placeholder = store.effectiveJob(state);
+  renderJobsSettings();
   $('setting-week-start').value = String(state.settings.weekStartsOn ?? 1);
 
   const undoImport = $('btn-undo-import');
@@ -695,6 +784,65 @@ function renderSettings() {
   if (state.lastImport) undoImport.textContent = `Undo last import (${state.lastImport.count} shifts)`;
 
   renderLogView();
+}
+
+function renderJobsSettings() {
+  const active = jobs.activeJobs(state);
+  const fallback = jobs.defaultJob(state);
+  $('jobs-list').innerHTML = state.jobs.length
+    ? state.jobs
+        .map((j) => {
+          const name = escapeHtml(j.name);
+          const note = j.archived ? 'Hidden. Past shifts stay in History.' : j.name === fallback && active.length > 1 ? 'Default job' : '';
+          const buttons = j.archived
+            ? `<button type="button" data-action="restore" data-name="${name}">Show</button>`
+            : `<button type="button" data-action="rename" data-name="${name}">Rename</button>
+               <button type="button" class="remove-job" data-action="remove" data-name="${name}">Remove</button>`;
+          return `<li class="${j.archived ? 'hidden-job' : ''}"><span class="job-name">${name}${note ? `<small>${note}</small>` : ''}</span>${buttons}</li>`;
+        })
+        .join('')
+    : `<li><span class="job-name">${escapeHtml(fallback)}<small>Used until you add a job.</small></span></li>`;
+
+  $('setting-job-mode').value = state.settings.jobMode ?? 'default';
+  $('setting-default-job').replaceChildren(...active.map((n) => new Option(n, n, false, n === fallback)));
+  $('default-job-field').hidden = state.settings.jobMode === 'ask' || active.length < 2;
+  $('job-mode-hint').textContent =
+    active.length < 2
+      ? 'With one job, Start Work never asks.'
+      : state.settings.jobMode === 'ask'
+        ? 'Start Work shows your jobs as buttons. Tap one to clock in.'
+        : `Start Work clocks you into ${fallback}.`;
+}
+
+function onJobAction(event) {
+  const button = event.target.closest('[data-action]');
+  if (!button) return;
+  const name = button.dataset.name;
+  const action = button.dataset.action;
+  try {
+    if (action === 'rename') {
+      const newName = prompt('New name for this job:', name);
+      if (newName == null || newName.trim() === name) return;
+      let changed = 0;
+      perform('renameJob', (s) => (changed = jobs.renameJob(s, name, newName)), () =>
+        `Renamed to ${newName.trim()}${changed ? `. Updated ${changed} shift${changed === 1 ? '' : 's'}` : ''}.`);
+    } else if (action === 'remove') {
+      if (!confirm(`Remove "${name}"? If it has past shifts, it is hidden instead and they stay in History.`)) return;
+      let result = '';
+      perform('removeJob', (s) => (result = jobs.removeJob(s, name)), () => (result === 'hidden' ? `"${name}" hidden.` : `"${name}" removed.`));
+    } else if (action === 'restore') {
+      perform('restoreJob', (s) => jobs.addJob(s, name), `"${name}" is back.`);
+    }
+  } catch (error) {
+    log.warn('action.rejected', { action: `job.${action}`, message: error.message });
+    alert(error.message);
+  }
+}
+
+function addJobFromPrompt() {
+  const name = prompt('Name of the job:');
+  if (name == null) return;
+  act('addJob', (s) => jobs.addJob(s, name), `Added "${name.trim()}".`);
 }
 
 function renderLogView() {
@@ -823,12 +971,21 @@ function wireUp() {
     log.info('settings.weekStartsOn', { weekStartsOn: state.settings.weekStartsOn });
     persist();
   });
-  $('setting-job').addEventListener('change', (e) => {
-    state.settings.job = e.target.value.trim();
-    log.info('settings.job', { job: state.settings.job });
+  $('jobs-list').addEventListener('click', onJobAction);
+  $('btn-add-job').addEventListener('click', addJobFromPrompt);
+  $('setting-job-mode').addEventListener('change', (e) => {
+    state.settings.jobMode = e.target.value;
+    log.info('settings.jobMode', { jobMode: state.settings.jobMode });
     persist();
     renderSettings();
   });
+  $('setting-default-job').addEventListener('change', (e) => {
+    state.settings.defaultJob = e.target.value;
+    log.info('settings.defaultJob', { defaultJob: state.settings.defaultJob });
+    persist();
+    renderSettings();
+  });
+  $('dlg-job-cancel').addEventListener('click', () => $('dlg-job').close());
   $('log-level').addEventListener('change', renderLogView);
   $('btn-export-logs').addEventListener('click', exportLogs);
   $('btn-clear-logs').addEventListener('click', () => {

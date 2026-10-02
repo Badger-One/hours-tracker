@@ -5,7 +5,8 @@
 //   {
 //     schema: 1,
 //     shifts: [ { id, job, start, end, breaks: [ { start, end } ], note, source, importBatch?, editedAt? } ],
-//     settings: { job, weekStartsOn },   // weekStartsOn: 0 = Sunday, 1 = Monday
+//     jobs: [ { name, archived } ],      // see jobs.js
+//     settings: { weekStartsOn, jobMode, defaultJob },   // weekStartsOn: 0 = Sunday, 1 = Monday; jobMode: 'default' | 'ask'
 //     lastImport: { batchId, at, count } | null,
 //     backup: { lastAt, hiddenOn }   // lastAt: ms of the last backup; hiddenOn: "2026-10-02" if the banner was hidden that day
 //   }
@@ -21,14 +22,21 @@ import { log } from './logger.js';
 import { newId } from './ids.js';
 import { storageKey } from './env.js';
 import { HOUR, MINUTE, formatDayHeading, formatTimeOfDay, formatWhen } from './time.js';
+import { migrateJobs, defaultJob, rememberJobs } from './jobs.js';
 
 export const STORAGE_KEY = storageKey('data:v1');
-const DEFAULT_JOB = 'Work';
 export const MAX_SCHEDULE_AHEAD_MS = 24 * HOUR;
 export const LONG_SHIFT_MS = 16 * HOUR;
 
 export function emptyState() {
-  return { schema: 1, shifts: [], settings: { job: '', weekStartsOn: 1 }, lastImport: null, backup: { lastAt: null, hiddenOn: null } };
+  return {
+    schema: 1,
+    shifts: [],
+    jobs: [],
+    settings: { weekStartsOn: 1, jobMode: 'default', defaultJob: null },
+    lastImport: null,
+    backup: { lastAt: null, hiddenOn: null },
+  };
 }
 
 /** Read saved data. If it is damaged, keep a copy for recovery and start empty instead of crashing. */
@@ -43,6 +51,10 @@ export function loadState(storage) {
     if (!parsed || !Array.isArray(parsed.shifts)) throw new Error('Saved data has no shifts list');
     const defaults = emptyState();
     const state = { ...defaults, ...parsed, settings: { ...defaults.settings, ...parsed.settings }, backup: { ...defaults.backup, ...parsed.backup } };
+    if (!Array.isArray(parsed.jobs)) {
+      delete state.jobs;
+      migrateJobs(state);
+    }
     log.info('store.load.ok', { shifts: state.shifts.length, bytes: raw.length });
     return state;
   } catch (error) {
@@ -90,12 +102,6 @@ export function currentStatus(state, now = Date.now()) {
   if (!shift) return 'off';
   if (shift.start > now) return 'scheduled';
   return activeBreak(shift) ? 'break' : 'working';
-}
-
-/** The job name new shifts get: the one in Settings, else the most recent shift's job, else "Work". */
-export function effectiveJob(state) {
-  if (state.settings.job?.trim()) return state.settings.job.trim();
-  return state.shifts.at(-1)?.job || DEFAULT_JOB;
 }
 
 export function findShift(state, id) {
@@ -200,11 +206,13 @@ function sortShifts(state) {
 
 // ---- Clock actions. `at` defaults to now; pass a different time for "Start at…", "Clock out at…" and so on. ----
 
-export function startWork(state, now, at = now) {
+/** `job` defaults to the default job; the screen passes the one you picked when it asks. */
+export function startWork(state, now, at = now, job = defaultJob(state)) {
   if (activeShift(state)) throw new Error('You are already clocked in.');
-  const shift = { id: newId(), job: effectiveJob(state), start: at, end: null, breaks: [], note: '', source: 'app' };
+  const shift = { id: newId(), job, start: at, end: null, breaks: [], note: '', source: 'app' };
   assertValid(shift, state, now);
   state.shifts.push(shift);
+  rememberJobs(state, [shift]);
   sortShifts(state);
   log.info(at > now ? 'shift.schedule' : 'shift.start', {
     id: shift.id,
@@ -291,7 +299,7 @@ export function updateShift(state, id, draft, now) {
 export function addShift(state, draft, now) {
   const shift = {
     id: newId(),
-    job: draft.job?.trim() || effectiveJob(state),
+    job: draft.job?.trim() || defaultJob(state),
     start: draft.start,
     end: draft.end,
     breaks: [...draft.breaks].sort((a, b) => a.start - b.start),
@@ -320,6 +328,7 @@ export function deleteShift(state, id) {
 export function applyImport(state, result, now) {
   state.shifts.push(...result.shifts);
   sortShifts(state);
+  rememberJobs(state, result.shifts);
   state.lastImport = { batchId: result.batchId, at: now, count: result.shifts.length };
   log.info('import.applied', { batchId: result.batchId, added: result.shifts.length, totalShifts: state.shifts.length });
 }
