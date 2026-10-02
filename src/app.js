@@ -14,7 +14,7 @@ import {
 import { importFiles } from './importers.js';
 import { buildHistory } from './history.js';
 import { backupDue, recordBackup, dismissBackupForToday } from './backup.js';
-import { buildExportCsv, exportFileName } from './exporter.js';
+import { buildExportCsv, backupFileName } from './exporter.js';
 import { saveFile } from './files.js';
 
 // ---- Startup ----
@@ -710,7 +710,7 @@ function renderLogView() {
  */
 async function backUp(from) {
   const shifts = state.shifts.filter((s) => s.end != null).length;
-  const how = await saveFile(exportFileName(Date.now()), buildExportCsv(state.shifts));
+  const how = await saveFile(backupFileName(Date.now()), buildExportCsv(state.shifts));
   if (how === 'cancelled') return;
   recordBackup(state, Date.now(), { shifts, how, from });
   persist();
