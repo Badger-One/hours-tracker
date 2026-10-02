@@ -67,9 +67,19 @@ The tests check the time math, CSV reading and writing, the Hours Tracker import
 3. Pick a new version number and put it in `src/version.js` and `package.json`. Raise the middle number for new features (0.2.0 to 0.3.0) and the last number for fixes (0.2.0 to 0.2.1). The number shows on the More screen, so you can tell when your phone has the new version.
 4. Add a section for that version at the top of [CHANGELOG.md](CHANGELOG.md) listing what changed.
 5. Commit, push, and open a pull request. The pull request form has a Changelog section; paste the same notes there.
-6. Merge it. Within about a minute GitHub publishes the new version and creates a [Release](https://github.com/Badger-One/hours-tracker/releases) with the changelog notes. Your phone picks it up the next time you open the app with a signal.
+6. Try it in the test copy first (see below).
+7. Merge it. Within about a minute GitHub publishes the new version and creates a [Release](https://github.com/Badger-One/hours-tracker/releases) with the changelog notes. Your phone picks it up the next time you switch to the app with a signal.
 
 A pull request that changes the app without steps 3 and 4 fails the **changelog** check, and `npm test` fails if the version in `src/version.js` has no changelog section.
+
+## The test copy (beta)
+
+A second copy of the app lives at **https://badger-one.github.io/hours-tracker/beta/**. It shows the latest change waiting for approval, so you can try it on your phone before it reaches your real app (or anyone you've shared it with).
+
+- Add it to your home screen the same way as the real app. It's called **Hours Beta**, has an orange icon, and shows an orange **BETA** strip at the top.
+- It keeps its own data. Nothing you do there touches your real hours. To try a change on your real history, export a CSV from the real app and import it into the beta.
+- It's published from the `beta` branch. To put a change there: `git push --force origin my-change:beta`. When the change is merged, reset it with `git push --force origin main:beta`.
+- When there's nothing waiting, the beta copy is the same as the real app.
 
 ## Project layout
 

@@ -7,7 +7,10 @@
 // If you add a file the app needs, add it to APP_FILES too.
 // tests/sw.test.js fails if this list and the real files drift apart.
 
-const CACHE = 'hours-tracker-v4';
+// The real app and the test copy (/beta/) share one website, so each names its
+// cache after its own folder and only clears out its own old caches.
+const CACHE_VERSION = 'v5';
+const CACHE = `${self.registration.scope}|${CACHE_VERSION}`;
 const NETWORK_TIMEOUT_MS = 3000;
 
 const APP_FILES = [
@@ -20,6 +23,7 @@ const APP_FILES = [
   'icons/icon-512.png',
   'src/app.js',
   'src/csv.js',
+  'src/env.js',
   'src/exporter.js',
   'src/files.js',
   'src/ids.js',
@@ -37,7 +41,7 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))),
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE && (k.startsWith(`${self.registration.scope}|`) || !k.includes('|'))).map((k) => caches.delete(k)))),
   );
   self.clients.claim();
 });

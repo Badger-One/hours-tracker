@@ -1,4 +1,5 @@
 // Draws the app icon (a white clock on teal) and saves it as PNG files in icons/.
+// Also draws an orange version in icons/beta/ for the test copy of the app.
 // Run with: npm run icons
 // Uses only Node's built-in modules, so there's nothing to install.
 
@@ -6,6 +7,7 @@ import { deflateSync } from 'node:zlib';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 const BG = [15, 118, 110];
+const BETA_BG = [234, 88, 12];
 const FG = [255, 255, 255];
 const SIZES = [180, 192, 512];
 const SAMPLES = 4; // 4x4 samples per pixel smooths the edges.
@@ -49,7 +51,7 @@ function chunk(type, data) {
   return Buffer.concat([len, body, crc]);
 }
 
-function drawIcon(size) {
+function drawIcon(size, bg = BG) {
   const stride = size * 3 + 1;
   const raw = Buffer.alloc(stride * size);
   for (let y = 0; y < size; y++) {
@@ -63,7 +65,7 @@ function drawIcon(size) {
       }
       const cover = hits / (SAMPLES * SAMPLES);
       for (let ch = 0; ch < 3; ch++) {
-        raw[y * stride + 1 + x * 3 + ch] = Math.round(BG[ch] + (FG[ch] - BG[ch]) * cover);
+        raw[y * stride + 1 + x * 3 + ch] = Math.round(bg[ch] + (FG[ch] - bg[ch]) * cover);
       }
     }
   }
@@ -80,9 +82,11 @@ function drawIcon(size) {
   ]);
 }
 
-const outDir = new URL('../icons/', import.meta.url);
-mkdirSync(outDir, { recursive: true });
-for (const size of SIZES) {
-  writeFileSync(new URL(`icon-${size}.png`, outDir), drawIcon(size));
-  console.log(`icons/icon-${size}.png`);
+for (const [folder, bg] of [['icons/', BG], ['icons/beta/', BETA_BG]]) {
+  const outDir = new URL(`../${folder}`, import.meta.url);
+  mkdirSync(outDir, { recursive: true });
+  for (const size of SIZES) {
+    writeFileSync(new URL(`icon-${size}.png`, outDir), drawIcon(size, bg));
+    console.log(`${folder}icon-${size}.png`);
+  }
 }
