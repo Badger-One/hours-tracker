@@ -13,7 +13,7 @@ export function backupDue(state, now) {
   const today = formatDate(now);
   if (!state.shifts.some((s) => s.end != null)) return false;
   if (state.backup.lastAt != null && formatDate(state.backup.lastAt) === today) return false;
-  if (state.backup.dismissedOn === today) return false;
+  if (state.backup.hiddenOn === today) return false; // (Beta 0.6.0 used "dismissedOn"; ignored on purpose so the banner came back.)
   return true;
 }
 
@@ -25,6 +25,6 @@ export function recordBackup(state, now, { shifts, how, from }) {
 
 /** Hide the banner until tomorrow. */
 export function dismissBackupForToday(state, now) {
-  state.backup.dismissedOn = formatDate(now);
+  state.backup.hiddenOn = formatDate(now);
   log.info('backup.dismissed', { until: 'tomorrow' });
 }

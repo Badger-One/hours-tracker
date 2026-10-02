@@ -11,7 +11,7 @@ Sections use these headings: **Added** (new features), **Changed** (existing fea
 ### Added
 
 - A **Back up to iCloud** banner on the Clock tab, under the Edit shift / Clock out at links. It shows once a day until you back up. Tap it, then **Save to Files**, then **Save**, without leaving the Clock tab. Each day's backup is its own file (for example `hours-tracker-2026-10-02.csv`) and restores everything when imported.
-- The banner's **×** hides it until tomorrow.
+- The banner's **×** hides it until tomorrow, with **Undo** in case you tap it by mistake.
 - Settings shows when you last backed up, and **Back up now** there counts as today's backup too.
 
 ## [0.5.0] - 2026-10-02

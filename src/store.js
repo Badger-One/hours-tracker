@@ -7,7 +7,7 @@
 //     shifts: [ { id, job, start, end, breaks: [ { start, end } ], note, source, importBatch?, editedAt? } ],
 //     settings: { job, weekStartsOn },   // weekStartsOn: 0 = Sunday, 1 = Monday
 //     lastImport: { batchId, at, count } | null,
-//     backup: { lastAt, dismissedOn }   // lastAt: ms of the last backup; dismissedOn: "2026-10-02" if the banner was hidden that day
+//     backup: { lastAt, hiddenOn }   // lastAt: ms of the last backup; hiddenOn: "2026-10-02" if the banner was hidden that day
 //   }
 //
 // `start` and `end` are epoch milliseconds. A shift or break with `end: null` is
@@ -28,7 +28,7 @@ export const MAX_SCHEDULE_AHEAD_MS = 24 * HOUR;
 export const LONG_SHIFT_MS = 16 * HOUR;
 
 export function emptyState() {
-  return { schema: 1, shifts: [], settings: { job: '', weekStartsOn: 1 }, lastImport: null, backup: { lastAt: null, dismissedOn: null } };
+  return { schema: 1, shifts: [], settings: { job: '', weekStartsOn: 1 }, lastImport: null, backup: { lastAt: null, hiddenOn: null } };
 }
 
 /** Read saved data. If it is damaged, keep a copy for recovery and start empty instead of crashing. */

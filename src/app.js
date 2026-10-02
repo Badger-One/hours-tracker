@@ -807,12 +807,9 @@ function wireUp() {
   // Settings
   $('btn-export').addEventListener('click', () => backUp('settings'));
   $('btn-backup').addEventListener('click', () => backUp('banner'));
-  $('btn-backup-dismiss').addEventListener('click', () => {
-    dismissBackupForToday(state, Date.now());
-    persist();
-    render();
-    showNotice('Backup reminder hidden until tomorrow.');
-  });
+  // Goes through perform() so the bar offers Undo if you tap × by mistake.
+  $('btn-backup-dismiss').addEventListener('click', () =>
+    perform('hideBackupReminder', dismissBackupForToday, 'Backup reminder hidden until tomorrow.'));
   $('import-input').addEventListener('change', onImportFilesChosen);
   $('btn-undo-import').addEventListener('click', () => {
     if (!confirm('Remove every shift added by the last import?')) return;

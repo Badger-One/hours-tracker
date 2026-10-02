@@ -44,6 +44,12 @@ test('data saved before backups existed loads with empty backup info', () => {
   const data = new Map([[store.STORAGE_KEY, JSON.stringify({ schema: 1, shifts: [], settings: { job: '' }, lastImport: null })]]);
   const storage = { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => data.set(k, v) };
   const s = store.loadState(storage);
-  assert.deepEqual(s.backup, { lastAt: null, dismissedOn: null });
+  assert.deepEqual(s.backup, { lastAt: null, hiddenOn: null });
   assert.equal(s.settings.weekStartsOn, 1);
+});
+
+test('a banner hidden in beta 0.6.0 (old "dismissedOn" flag) shows again', () => {
+  const s = withAShift();
+  s.backup.dismissedOn = '2026-10-02';
+  assert.equal(backupDue(s, TODAY_9AM), true);
 });
