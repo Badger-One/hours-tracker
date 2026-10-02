@@ -38,6 +38,10 @@
 
 html, body { margin: 0; }
 
+/* No double-tap zoom: two quick taps on a heading should open and close it, not zoom.
+   Pinch zoom is blocked in app.js. */
+html { touch-action: manipulation; }
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -204,7 +208,7 @@ select, input[type="text"] {
 .year-head,
 .month-head {
   display: grid;
-  grid-template-columns: 1.1em minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   column-gap: 6px;
   align-items: baseline;
   width: 100%;
@@ -223,7 +227,19 @@ select, input[type="text"] {
 .year-head .total { font-size: 20px; font-weight: 800; color: var(--work); }
 .month-head .label, .month-head .total { font-weight: 700; }
 .month-head .total { color: var(--work); }
-.chev { color: var(--muted); font-size: 14px; }
+/* A drawn chevron: points right when closed, turns to point down when open. */
+.chev {
+  width: 22px;
+  height: 22px;
+  align-self: center;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.15s;
+}
+[aria-expanded="true"] > .chev { transform: rotate(90deg); }
 .sub { grid-column: 2 / 4; color: var(--muted); font-size: 13px; }
 
 .week-head {

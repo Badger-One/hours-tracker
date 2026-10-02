@@ -134,6 +134,12 @@ export function timeOnOrAfter(baseMs, text) {
   return d.getTime();
 }
 
+/** Nearest 15 minutes: 5:07 PM -> 5:00 PM, 5:08 PM -> 5:15 PM. */
+export function roundToQuarterHour(ms) {
+  const quarter = 15 * MINUTE;
+  return Math.round(ms / quarter) * quarter;
+}
+
 /** Drop the seconds, so "7:00:40" counts as at-or-after "7:00". */
 export function startOfMinute(ms) {
   return Math.floor(ms / MINUTE) * MINUTE;

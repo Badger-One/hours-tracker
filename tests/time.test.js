@@ -50,3 +50,11 @@ test('formatting', () => {
   assert.equal(formatTimeOfDay(at(2026, 10, 1, 16, 7)), '4:07 PM');
   assert.equal(formatDate(at(2026, 1, 5, 9)), '2026-01-05');
 });
+
+test('roundToQuarterHour', async () => {
+  const { roundToQuarterHour } = await import('../src/time.js');
+  const at = (h, mi) => new Date(2026, 9, 1, h, mi).getTime();
+  assert.equal(roundToQuarterHour(at(17, 7)), at(17, 0));
+  assert.equal(roundToQuarterHour(at(17, 8)), at(17, 15));
+  assert.equal(roundToQuarterHour(at(8, 0)), at(8, 0));
+});

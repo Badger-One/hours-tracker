@@ -9,7 +9,7 @@ import * as store from './store.js';
 import {
   MINUTE, HOUR, totalsForDay, workedMs, breakMs, startOfDay, startOfMinute,
   formatClock, formatHM, formatTimeOfDay, formatDate, formatDayHeading, formatWhen, formatShortDay, formatMonthHeading, formatMonthDay,
-  toTimeInput, fromDateAndTime, timeOnOrAfter,
+  toTimeInput, fromDateAndTime, timeOnOrAfter, roundToQuarterHour,
 } from './time.js';
 import { importFiles } from './importers.js';
 import { buildHistory } from './history.js';
@@ -222,7 +222,8 @@ function openShiftEditor(shift) {
     $('shift-job').value = shift.job;
     $('shift-note').value = shift.note ?? '';
   } else {
-    // Start with yesterday, at the same times as your most recent shift (or 9 to 5).
+    // Start with yesterday, at the same times as your most recent shift rounded to the
+    // nearest 15 minutes (8:00 AM to 5:07 PM becomes 8:00 AM to 5:00 PM), or 9 to 5.
     const last = state.shifts.filter((s) => s.end != null).at(-1);
     const sameTimeYesterday = (ms) => {
       const d = new Date(ms);
@@ -231,8 +232,8 @@ function openShiftEditor(shift) {
       y.setHours(d.getHours(), d.getMinutes(), 0, 0);
       return y.getTime();
     };
-    const start = last ? sameTimeYesterday(last.start) : startOfDay(now) - 15 * HOUR;
-    let end = last ? sameTimeYesterday(last.end) : startOfDay(now) - 7 * HOUR;
+    const start = last ? roundToQuarterHour(sameTimeYesterday(last.start)) : startOfDay(now) - 15 * HOUR;
+    let end = last ? roundToQuarterHour(sameTimeYesterday(last.end)) : startOfDay(now) - 7 * HOUR;
     if (end <= start) end = start + 8 * HOUR; // The last shift crossed midnight.
     editing = { id: null, isNew: true, running: false, start, end, rows: [] };
     $('shift-job').value = store.effectiveJob(state);
@@ -550,7 +551,7 @@ function daysSummary(t) {
 function groupHeading({ key, openByDefault, cls, label, totals }) {
   const open = isOpen(key, openByDefault);
   return `<button type="button" class="${cls}" data-toggle="${key}" data-default-open="${openByDefault}" aria-expanded="${open}">
-    <span class="chev" aria-hidden="true">${open ? '▾' : '▸'}</span>
+    <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
     <span class="label">${label}</span>
     <span class="total">${formatHM(totals.workedMs)}</span>
     <span class="sub">${daysSummary(totals)}</span>
@@ -584,16 +585,15 @@ function renderHistory() {
     box.innerHTML = '<p class="empty">No shifts yet. Tap Start Work on the Clock tab, or import a CSV from More.</p>';
     return;
   }
-  const thisMonth = formatDate(now).slice(0, 7);
   const years = buildHistory(state.shifts, now, { weekStartsOn: state.settings.weekStartsOn ?? 1 });
 
   box.innerHTML = years
     .map((y) => {
       const yearKey = `year-${y.year}`;
-      const months = isOpen(yearKey, true)
+      const months = isOpen(yearKey, false)
         ? y.months
             .map((m) => {
-              const openByDefault = m.key === thisMonth;
+              const openByDefault = false;
               return `<div class="month">
                 ${groupHeading({ key: m.key, openByDefault, cls: 'month-head', label: formatMonthHeading(m.start), totals: m })}
                 ${isOpen(m.key, openByDefault) ? monthBody(m, now) : ''}
@@ -601,7 +601,7 @@ function renderHistory() {
             })
             .join('')
         : '';
-      return `<section class="year">${groupHeading({ key: yearKey, openByDefault: true, cls: 'year-head', label: y.year, totals: y })}${months}</section>`;
+      return `<section class="year">${groupHeading({ key: yearKey, openByDefault: false, cls: 'year-head', label: y.year, totals: y })}${months}</section>`;
     })
     .join('');
 }
@@ -745,6 +745,9 @@ function render() {
 }
 
 function wireUp() {
+  // Block pinch zoom. iOS ignores user-scalable=no, but these gesture events let us stop it.
+  for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault());
+
   for (const b of document.querySelectorAll('.tabbar button')) {
     b.addEventListener('click', () => showView(b.dataset.view));
   }
@@ -821,27 +824,38 @@ function wireUp() {
 /**
  * iPhone keeps a home-screen app frozen in the background instead of reopening it,
  * so a new version wouldn't show up until you swiped the app closed. Instead, each
- * time you come back, ask the server for the current version number and reload if
- * it's newer. Your data is saved on the phone, so reloading loses nothing. It waits
- * if a popup or an import review is open.
+ * time you come back, the app asks which build is published (build.txt, written by
+ * the publish workflow) and reloads if it's a different one from when it started.
+ * Comparing builds instead of version numbers means fixes to Hours Beta show up even
+ * when the version number stays the same. Your data is saved on the phone, so
+ * reloading loses nothing. It waits if a popup or an import review is open.
  */
-async function checkForUpdate() {
+let startedOnBuild = null;
+
+async function publishedBuild() {
   try {
-    const res = await fetch('src/version.js', { cache: 'no-store' });
-    if (!res.ok) return;
-    const latest = /APP_VERSION = '([^']+)'/.exec(await res.text())?.[1];
-    if (!latest || latest === APP_VERSION) return;
-    if (document.querySelector('dialog[open]') || pendingImport) {
-      log.info('app.update.waiting', { from: APP_VERSION, to: latest, reason: 'popup or import open' });
-      return;
-    }
-    log.info('app.update', { from: APP_VERSION, to: latest });
-    flushLogs();
-    location.reload();
-  } catch (error) {
-    // No signal: try again next time.
-    log.debug('app.update.check.failed', { message: error.message });
+    const res = await fetch('build.txt', { cache: 'no-store' });
+    return res.ok ? (await res.text()).trim() : null;
+  } catch {
+    return null; // No signal.
   }
+}
+
+async function checkForUpdate() {
+  const latest = await publishedBuild();
+  if (!latest) return;
+  if (!startedOnBuild) {
+    startedOnBuild = latest;
+    return;
+  }
+  if (latest === startedOnBuild) return;
+  if (document.querySelector('dialog[open]') || pendingImport) {
+    log.info('app.update.waiting', { from: startedOnBuild, to: latest, reason: 'popup or import open' });
+    return;
+  }
+  log.info('app.update', { version: APP_VERSION, from: startedOnBuild, to: latest });
+  flushLogs();
+  location.reload();
 }
 
 function registerServiceWorker() {
@@ -857,6 +871,7 @@ function registerServiceWorker() {
 
 $('beta-strip').hidden = !IS_BETA;
 wireUp();
+checkForUpdate(); // Records which build this launch started on.
 render();
 checkStoragePersistence();
 registerServiceWorker();
