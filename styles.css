@@ -560,8 +560,6 @@ details.card[open] summary { margin-bottom: 8px; }
 
 .earned-card { margin: -10px 0 20px; }
 .earned-card .stat-value { color: var(--work); }
-.earned-sub { color: var(--muted); font-size: 13px; }
-.earned-sub:empty { display: none; }
 
 .rate-row { display: grid; grid-template-columns: 1fr 1.2fr auto; gap: 6px; align-items: center; margin-bottom: 8px; }
 .rate-row input { min-width: 0; }

@@ -6,7 +6,6 @@
 //     rates: [ { from: '2026-01-01', amount } ],   // $/hour, or for a salary $/year or $/month (see per), each from that day on
 //     per: 'year' | 'month',                                               // salary only; month suits fixed monthly pay like military pay
 //     overtime: { enabled, threshold, per: 'week' | 'day', multiplier },   // hourly only
-//     expectedWeeklyHours,                                                 // salary only
 //   }
 //
 // Old shifts keep the rate that applied on the day they started, so a raise never
@@ -17,7 +16,6 @@ import { HOUR, workedMs, startOfDay, startOfNextDay, formatDate } from './time.j
 import { startOfWeek } from './history.js';
 
 export const DEFAULT_OVERTIME = { enabled: true, threshold: 40, per: 'week', multiplier: 1.5 };
-export const DEFAULT_EXPECTED_WEEKLY_HOURS = 40;
 
 const sameName = (a, b) => (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase();
 
@@ -46,11 +44,6 @@ export function annualAmount(pay, amount) {
 function annualOn(pay, ms) {
   const rate = rateOn(pay, ms);
   return rate == null ? null : annualAmount(pay, rate);
-}
-
-/** The hourly rate a salary works out to at the expected hours: $80,000 at 40 h/week is $38.46/h. */
-export function salaryHourlyPace(annual, expectedWeeklyHours) {
-  return annual / (52 * (expectedWeeklyHours || DEFAULT_EXPECTED_WEEKLY_HOURS));
 }
 
 /**
@@ -158,19 +151,14 @@ export function groupPay(state, shifts, from, to, kind, hourlyPay, now) {
 }
 
 /**
- * What you've earned today, for the Clock tab.
- * Hourly: each of today's shifts at its rate, with overtime.
- * Salary: earns at the salary's hourly pace until you reach your expected hours for
- * the week, then stops; \`salaryRate\` is then what the week's pay works out to per
- * hour you've actually worked, which drops the longer you work.
+ * What you've earned today, for the Clock tab: each of today's shifts on an hourly
+ * job, at its rate, with overtime. Salaried jobs aren't counted: a salary pays the
+ * same however long you work, so there's nothing to count up (History shows it).
  */
 export function earnedToday(state, now, hourlyPay) {
   const dayStart = startOfDay(now);
-  const weekStart = startOfWeek(now, state.settings.weekStartsOn ?? 1);
   let amount = 0;
   let hasPay = false;
-  let salaryRate = null;
-
   for (const s of state.shifts) {
     if (s.start < dayStart || s.start > now) continue;
     const p = hourlyPay.get(s.id);
@@ -179,24 +167,12 @@ export function earnedToday(state, now, hourlyPay) {
       hasPay = true;
     }
   }
+  return { amount, hasPay };
+}
 
-  for (const job of state.jobs) {
-    const pay = payForJob(state, job.name);
-    if (pay?.type !== 'salary') continue;
-    const annual = annualOn(pay, now);
-    if (annual == null) continue;
-    const expected = (pay.expectedWeeklyHours || DEFAULT_EXPECTED_WEEKLY_HOURS) * HOUR;
-    const pace = salaryHourlyPace(annual, pay.expectedWeeklyHours);
-    const weekShifts = state.shifts.filter((s) => sameName(s.job, job.name));
-    const workedUpTo = (t) => weekShifts.reduce((sum, s) => sum + workedMs(s, now, weekStart, t), 0);
-    const weekSoFar = workedUpTo(now);
-    if (weekSoFar === 0) continue;
-    const beforeToday = workedUpTo(dayStart);
-    amount += ((Math.min(weekSoFar, expected) - Math.min(beforeToday, expected)) / HOUR) * pace;
-    hasPay = true;
-    salaryRate = weekSoFar > expected ? (annual / 52) / (weekSoFar / HOUR) : pace;
-  }
-  return { amount, hasPay, salaryRate };
+/** True when a job is paid hourly, so the Clock tab shows Earned today. */
+export function hasHourlyJob(state) {
+  return state.jobs.some((j) => payForJob(state, j.name)?.type === 'hourly');
 }
 
 /** "$1,234.56", or "$1,235" with cents: false. */
@@ -235,6 +211,5 @@ export function validatePay(pay) {
     if (!(pay.overtime.threshold > 0)) problems.push('Overtime: enter the hours it starts after.');
     if (!(pay.overtime.multiplier >= 1)) problems.push('Overtime: the multiplier must be 1 or more (1.5 is time and a half).');
   }
-  if (pay.type === 'salary' && !(pay.expectedWeeklyHours > 0)) problems.push('Enter your expected hours per week.');
   return problems;
 }

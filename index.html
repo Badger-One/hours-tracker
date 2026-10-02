@@ -56,11 +56,10 @@
         </div>
       </div>
 
-      <!-- Shown once a job has pay set up (Settings > Jobs > Pay) -->
+      <!-- Shown once a job is paid hourly (Settings > Jobs > Pay) -->
       <div id="earned-card" class="stat earned-card" hidden>
         <span class="stat-label">Earned today</span>
         <span id="stat-earned" class="stat-value">$0.00</span>
-        <span id="earned-sub" class="earned-sub"></span>
       </div>
 
       <div id="actions" class="actions"></div>
@@ -264,10 +263,6 @@
           </div>
         </div>
 
-        <div id="pay-salary-options" class="field">
-          <label class="field"><span>Expected hours per week</span><input id="pay-expected" type="number" inputmode="decimal" min="1" step="0.5"></label>
-          <p class="hint">Earned today counts up until you reach these hours in a week. After that, the Clock tab shows what your pay works out to per hour you actually worked.</p>
-        </div>
       </div>
 
       <ul id="pay-errors" class="form-error" role="alert"></ul>

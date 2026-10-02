@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as store from '../src/store.js';
-import { rateOn, hourlyShiftPay, salaryShare, groupPay, earnedToday, salaryHourlyPace, formatMoney, describePay } from '../src/pay.js';
+import { rateOn, hourlyShiftPay, salaryShare, groupPay, earnedToday, hasHourlyJob, formatMoney, describePay } from '../src/pay.js';
 
 const at = (y, mo, d, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi).getTime();
 const HOUR = 3600e3;
@@ -16,7 +16,7 @@ function setup(pay, shifts, { job = 'Tech', weekStartsOn = 1 } = {}) {
   return s;
 }
 const hourly = (rates, overtime = { enabled: false }) => ({ type: 'hourly', rates, overtime });
-const salary = (rates, expectedWeeklyHours = 40) => ({ type: 'salary', rates, expectedWeeklyHours });
+const salary = (rates) => ({ type: 'salary', rates });
 const NOW = at(2026, 10, 30, 12);
 
 test('rateOn picks the latest rate that has started', () => {
@@ -105,18 +105,15 @@ test('earned today, hourly: counts the running shift up to now', () => {
   s.shifts.push({ id: 'run', job: 'Tech', start: at(2026, 10, 2, 8), end: null, breaks: [] });
   const e = earnedToday(s, now, hourlyShiftPay(s, now));
   near(e.amount, 40, '2h at $20');
-  assert.equal(e.salaryRate, null);
 });
 
-test('earned today, salary: earns at pace until expected weekly hours, then stops', () => {
-  // Week of Mon Sep 28. 38h Mon to Thu, then Friday Oct 2 from 8 AM; now is 12 PM (4h).
+test('earned today leaves salaried jobs out', () => {
   const now = at(2026, 10, 2, 12);
-  const s = setup(salary([{ from: '2026-01-01', amount: 80000 }], 40), [[2026, 9, 28, 8, 10], [2026, 9, 29, 8, 10], [2026, 9, 30, 8, 9], [2026, 10, 1, 8, 9]]);
+  const s = setup(salary([{ from: '2026-01-01', amount: 60000 }]), []);
   s.shifts.push({ id: 'run', job: 'Tech', start: at(2026, 10, 2, 8), end: null, breaks: [] });
-  const e = earnedToday(s, now, hourlyShiftPay(s, now));
-  const pace = salaryHourlyPace(80000, 40);
-  near(e.amount, 2 * pace, 'only 2 of the 4 hours today count');
-  near(e.salaryRate, 80000 / 52 / 42, 'weekly pay spread over 42h worked');
+  assert.equal(earnedToday(s, now, hourlyShiftPay(s, now)).hasPay, false);
+  assert.equal(hasHourlyJob(s), false);
+  assert.equal(hasHourlyJob(setup(hourly([{ from: '2026-01-01', amount: 20 }]), [])), true);
 });
 
 test('formatting', () => {
@@ -134,7 +131,6 @@ test('validatePay explains what to fix', async () => {
   assert.match(validatePay(hourly([{ from: '', amount: 20 }]))[0], /start date/);
   assert.match(validatePay(hourly([{ from: '2026-01-01', amount: 20 }, { from: '2026-01-01', amount: 22 }]))[0], /same day/);
   assert.match(validatePay(hourly([{ from: '2026-01-01', amount: 20 }], { enabled: true, threshold: 40, per: 'week', multiplier: 0.5 }))[0], /1 or more/);
-  assert.match(validatePay(salary([{ from: '2026-01-01', amount: 80000 }], 0))[0], /expected hours/);
 });
 
 test('renaming a job keeps its pay; setJobPay clears with null', async () => {
@@ -147,7 +143,7 @@ test('renaming a job keeps its pay; setJobPay clears with null', async () => {
 });
 
 test('monthly salary (like military pay): each month shows exactly that amount', () => {
-  const pay = { type: 'salary', per: 'month', rates: [{ from: '2026-01-01', amount: 4321.5 }], expectedWeeklyHours: 40 };
+  const pay = { type: 'salary', per: 'month', rates: [{ from: '2026-01-01', amount: 4321.5 }] };
   near(salaryShare(pay, at(2026, 9, 1), at(2026, 10, 1), 'month'), 4321.5, 'September');
   near(salaryShare(pay, at(2026, 2, 1), at(2026, 3, 1), 'month'), 4321.5, 'February');
   near(salaryShare(pay, at(2026, 9, 28), at(2026, 10, 5), 'week'), (4321.5 * 12) / 52, 'a week');

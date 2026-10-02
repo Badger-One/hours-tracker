@@ -18,7 +18,7 @@ import * as jobs from './jobs.js';
 import { typedConfirmation } from './confirm.js';
 import {
   payForJob, hourlyShiftPay, groupPay, earnedToday, formatMoney, describePay, validatePay,
-  DEFAULT_OVERTIME, DEFAULT_EXPECTED_WEEKLY_HOURS,
+  DEFAULT_OVERTIME, hasHourlyJob,
 } from './pay.js';
 import { buildExportCsv, backupFileName } from './exporter.js';
 import { saveFile } from './files.js';
@@ -582,13 +582,10 @@ function renderClock() {
   $('stat-break').textContent = formatClock(thisBreak);
   $('stat-break-today').textContent = formatClock(today.breakMs);
 
-  const anyPay = state.jobs.some((j) => payForJob(state, j.name));
-  $('earned-card').hidden = !anyPay;
-  if (anyPay) {
-    const earned = earnedToday(state, now, hourlyShiftPay(state, now));
-    $('stat-earned').textContent = formatMoney(earned.amount);
-    $('earned-sub').textContent = earned.salaryRate != null ? `Salary works out to ${formatMoney(earned.salaryRate)}/hr this week` : '';
-  }
+  // Earned today counts hourly jobs only; a salary pays the same however long you work.
+  const showEarned = hasHourlyJob(state);
+  $('earned-card').hidden = !showEarned;
+  if (showEarned) $('stat-earned').textContent = formatMoney(earnedToday(state, now, hourlyShiftPay(state, now)).amount);
 
   const showBackup = backupDue(state, now);
   $('backup-banner').hidden = !showBackup;
@@ -940,7 +937,6 @@ function openPayEditor(jobName) {
   $('pay-ot-threshold').value = ot.threshold;
   $('pay-ot-per').value = ot.per;
   $('pay-ot-multiplier').value = ot.multiplier;
-  $('pay-expected').value = pay?.expectedWeeklyHours ?? DEFAULT_EXPECTED_WEEKLY_HOURS;
   renderRateRows();
   updatePayForm();
   log.debug('dialog.pay.open', { job: jobName });
@@ -992,7 +988,7 @@ function readPayDraft() {
       },
     };
   }
-  return { type, per: $('pay-per').value, rates, expectedWeeklyHours: Number($('pay-expected').value) };
+  return { type, per: $('pay-per').value, rates };
 }
 
 function updatePayForm() {
@@ -1000,7 +996,6 @@ function updatePayForm() {
   $('pay-details').hidden = !type;
   $('pay-per-field').hidden = type !== 'salary';
   $('pay-hourly-options').hidden = type !== 'hourly';
-  $('pay-salary-options').hidden = type !== 'salary';
   $('pay-ot-fields').hidden = !$('pay-ot-enabled').checked;
   $('pay-rates-label').textContent =
     type === 'hourly' ? 'Dollars per hour' : $('pay-per').value === 'month' ? 'Dollars per month' : 'Dollars per year';
