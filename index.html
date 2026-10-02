@@ -214,12 +214,12 @@
     </form>
   </dialog>
 
-  <!-- "Which job?" on Start Work, when Settings says to ask -->
+  <!-- A list of big buttons to pick from: "Which job?" on Start Work, and the History job filter -->
   <dialog id="dlg-job" class="sheet">
     <form method="dialog" id="form-job">
       <div class="sheet-bar">
         <button type="button" id="dlg-job-cancel" class="bar-button cancel">Cancel</button>
-        <h2 tabindex="-1" autofocus>Which job?</h2>
+        <h2 id="dlg-job-title" tabindex="-1" autofocus>Which job?</h2>
         <span class="bar-spacer"></span>
       </div>
       <div id="dlg-job-list" class="job-choices"></div>

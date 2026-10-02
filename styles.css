@@ -531,8 +531,8 @@ details.card[open] summary { margin-bottom: 8px; }
 
 .current-job { color: var(--text); font-weight: 700; margin-bottom: 4px; overflow-wrap: anywhere; }
 
-/* History job filter: a row of buttons that scrolls sideways if there are many jobs. */
-.job-filter { display: flex; gap: 8px; overflow-x: auto; margin: 0 0 14px; padding-bottom: 2px; }
+/* History job filter: "All jobs" and "Filter jobs" side by side. */
+.job-filter { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; margin: 0 0 14px; }
 .job-filter[hidden] { display: none; }
 .job-filter button {
   flex: none;
@@ -548,5 +548,10 @@ details.card[open] summary { margin-bottom: 8px; }
   cursor: pointer;
 }
 .job-filter button[aria-pressed="true"] { background: var(--go); border-color: var(--go); color: #fff; }
+.job-filter .filter-button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-filter .filter-button::after { content: " ▾"; }
+/* The current choice in a pick-one popup. */
+.job-choices.with-current .button.selected { outline: 3px solid var(--text); outline-offset: 2px; }
+.job-choices.with-current .button:not(.selected) { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
 
 #shift-job { width: 100%; }

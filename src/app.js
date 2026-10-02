@@ -162,39 +162,59 @@ function exactIfNow(at) {
 
 // ---- Which job? ----
 
-let jobPicked = null;
-
 /**
- * Calls `then(job)` with the job for a new shift. When Settings says "Ask which job
- * every time" and you have 2+ jobs, it shows the job buttons first; otherwise it
- * uses the default job right away.
+ * A popup of big buttons. `options` is [{ label, note?, value, selected? }];
+ * tapping one closes the popup and calls onPick(value).
  */
-function chooseJob(then) {
-  if (!jobs.needsJobPick(state)) return then(jobs.defaultJob(state));
-  const fallback = jobs.defaultJob(state);
+function pickFromList({ title, options, onPick }) {
+  $('dlg-job-title').textContent = title;
+  // When one option is the current choice (History filter), others look plain so it stands out.
+  $('dlg-job-list').classList.toggle('with-current', options.some((o) => o.selected));
   $('dlg-job-list').replaceChildren(
-    ...jobs.activeJobs(state).map((name) => {
+    ...options.map((o) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'button';
-      b.textContent = name;
-      if (name === fallback) b.insertAdjacentHTML('beforeend', '<small>Default job</small>');
+      b.className = o.selected ? 'button selected' : 'button';
+      b.textContent = o.label;
+      if (o.note) b.insertAdjacentHTML('beforeend', `<small>${escapeHtml(o.note)}</small>`);
       b.addEventListener('click', () => {
         $('dlg-job').close();
-        log.info('jobs.picked', { job: name });
-        jobPicked(name);
+        onPick(o.value);
       });
       return b;
     }),
   );
-  jobPicked = then;
   $('dlg-job').showModal();
+}
+
+/**
+ * Calls `then(job)` with the job for a new shift. When Settings says "Ask which job
+ * every time" (or `always` is set, for "Other job…") and you have 2+ jobs, it shows
+ * the job buttons first; otherwise it uses the default job right away.
+ */
+function chooseJob(then, { always = false } = {}) {
+  const ask = always ? jobs.activeJobs(state).length >= 2 : jobs.needsJobPick(state);
+  if (!ask) return then(jobs.defaultJob(state));
+  const fallback = jobs.defaultJob(state);
+  pickFromList({
+    title: 'Which job?',
+    options: jobs.activeJobs(state).map((name) => ({ label: name, value: name, note: name === fallback ? 'Default job' : '' })),
+    onPick: (job) => {
+      log.info('jobs.picked', { job });
+      then(job);
+    },
+  });
 }
 
 /** "Clocked in at 8:00 AM" plus the job name when you have more than one job. */
 function clockedInMessage(at, now, job) {
   const base = at > now ? `Starting at ${formatWhen(at, now)}` : `Clocked in at ${formatWhen(at, now)}`;
   return jobs.activeJobs(state).length > 1 ? `${base} · ${job}` : base;
+}
+
+/** "Other job…": clock in to a job other than the default without changing Settings. */
+function startWorkOtherJob() {
+  chooseJob((job) => act('startWork', (s, now) => store.startWork(s, now, now, job), (now) => clockedInMessage(now, now, job)), { always: true });
 }
 
 function startWorkNow() {
@@ -479,6 +499,14 @@ const BUTTONS = {
 
 const editCurrent = () => openShiftEditor(store.activeShift(state));
 
+/** The small links under the big buttons. "Other job…" appears with 2+ jobs when Start Work doesn't ask. */
+function linksFor(status) {
+  if (status === 'off' && state.settings.jobMode !== 'ask' && jobs.activeJobs(state).length >= 2) {
+    return [...LINKS.off, { label: 'Other job…', run: startWorkOtherJob }];
+  }
+  return LINKS[status];
+}
+
 const LINKS = {
   off: [{ label: 'Start at…', run: pickStartTime }],
   scheduled: [{ label: 'Change start time', run: pickScheduledStart }],
@@ -558,11 +586,13 @@ function renderClock() {
   if (longRunning) $('long-shift-text').textContent = `You've been clocked in since ${formatWhen(shift.start, now)}. Forgot to clock out?`;
 
   // Rebuilding buttons every second would swallow taps, so only do it when the status changes.
-  if (status !== renderedStatus) {
-    if (renderedStatus === 'scheduled' && status === 'working') log.info('shift.schedule.began', { id: shift.id });
+  const links = linksFor(status);
+  const buttonsKey = `${status}|${links.map((l) => l.label).join()}`;
+  if (buttonsKey !== renderedStatus) {
+    if (renderedStatus?.startsWith('scheduled|') && status === 'working') log.info('shift.schedule.began', { id: shift.id });
     $('actions').replaceChildren(...makeButtons(BUTTONS[status], (b) => `button ${b.cls}`.trim()));
-    $('more-actions').replaceChildren(...makeButtons(LINKS[status], () => 'link-button'));
-    renderedStatus = status;
+    $('more-actions').replaceChildren(...makeButtons(links, () => 'link-button'));
+    renderedStatus = buttonsKey;
   }
 }
 
@@ -653,8 +683,9 @@ function monthBody(month, now) {
 }
 
 /**
- * With shifts from 2+ jobs, History shows a row of buttons (All jobs, then each job).
- * Picking a job shows only its shifts, so every total becomes that job's total.
+ * With shifts from 2+ jobs, History shows two buttons: "All jobs" and "Filter jobs".
+ * Filter jobs opens a popup of your jobs; picking one shows only its shifts, so every
+ * total becomes that job's total, and the button shows the job's name. All jobs clears it.
  * Returns the shifts to show. The choice is remembered on this phone.
  */
 function renderJobFilter() {
@@ -665,22 +696,36 @@ function renderJobFilter() {
     return state.shifts;
   }
   const current = names.includes(ui.jobFilter) ? ui.jobFilter : null;
-  box.hidden = false;
-  box.replaceChildren(
-    ...[null, ...names].map((name) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = name ?? 'All jobs';
-      b.setAttribute('aria-pressed', String(name === current));
-      b.addEventListener('click', () => {
-        ui.jobFilter = name;
-        saveUi();
-        log.debug('history.jobFilter', { job: name });
-        renderHistory();
-      });
-      return b;
+  const setFilter = (job) => {
+    ui.jobFilter = job;
+    saveUi();
+    log.debug('history.jobFilter', { job });
+    renderHistory();
+  };
+  const all = document.createElement('button');
+  all.type = 'button';
+  all.textContent = 'All jobs';
+  all.setAttribute('aria-pressed', String(current == null));
+  all.addEventListener('click', () => setFilter(null));
+
+  const filter = document.createElement('button');
+  filter.type = 'button';
+  filter.className = 'filter-button';
+  filter.textContent = current ?? 'Filter jobs';
+  filter.setAttribute('aria-pressed', String(current != null));
+  filter.addEventListener('click', () =>
+    pickFromList({
+      title: 'Filter jobs',
+      options: [
+        { label: 'All jobs', value: null, selected: current == null },
+        ...names.map((n) => ({ label: n, value: n, selected: n === current })),
+      ],
+      onPick: setFilter,
     }),
   );
+
+  box.hidden = false;
+  box.replaceChildren(all, filter);
   return current ? state.shifts.filter((s) => s.job === current) : state.shifts;
 }
 
